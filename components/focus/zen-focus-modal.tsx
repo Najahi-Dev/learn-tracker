@@ -26,7 +26,11 @@ import {
 import { toast } from "sonner";
 import { useFocus, FocusMode, AmbientSound } from "@/components/providers/focus-provider";
 
-export function ZenFocusModal() {
+interface ZenFocusModalProps {
+  triggerButton?: React.ReactNode;
+}
+
+export function ZenFocusModal({ triggerButton }: ZenFocusModalProps = {}) {
   const {
     mode,
     timeLeft,
@@ -47,20 +51,24 @@ export function ZenFocusModal() {
   return (
     <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
       <DialogTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full justify-start gap-2 border-primary/40 bg-card hover:bg-primary/10 transition-colors shadow-xs"
-        >
-          <Sparkles className="h-3.5 w-3.5 text-primary" />
-          <span className="text-xs font-semibold">Zen Focus Studio</span>
-          {isRunning && (
-            <span className="ml-auto flex items-center gap-1.5 text-[10px] font-mono font-bold text-primary">
-              <span className="h-2 w-2 rounded-full bg-primary animate-ping" />
-              {formatTime(timeLeft)}
-            </span>
-          )}
-        </Button>
+        {triggerButton ? (
+          triggerButton
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full justify-start gap-2 border-primary/40 bg-card hover:bg-primary/10 transition-colors shadow-xs"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-primary" />
+            <span className="text-xs font-semibold">Zen Focus Studio</span>
+            {isRunning && (
+              <span className="ml-auto flex items-center gap-1.5 text-[10px] font-mono font-bold text-primary">
+                <span className="h-2 w-2 rounded-full bg-primary animate-ping" />
+                {formatTime(timeLeft)}
+              </span>
+            )}
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[700px] border-border/80 bg-background/95 backdrop-blur-md p-6 shadow-2xl">
         <DialogHeader>

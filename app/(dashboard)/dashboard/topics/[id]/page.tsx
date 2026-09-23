@@ -29,6 +29,8 @@ import {
   GripVertical,
   Pencil,
   X,
+  FileUp,
+  Brain,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -547,18 +549,62 @@ export default function TopicDetailPage({
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          <ZenFocusModal />
-          <PdfUploadDialog topicId={topicId} topicName={topic.name} />
-          <FeynmanEvaluatorDialog topicName={topic.name} />
+        {/* Top Action Buttons - Responsive */}
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
+          <ZenFocusModal
+            triggerButton={
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 border-primary/40 bg-card hover:bg-primary/10 text-xs h-8.5 px-2.5 sm:px-3 shadow-xs cursor-pointer"
+              >
+                <Sparkles className="h-3.5 w-3.5 text-primary" />
+                <span className="hidden sm:inline">Zen Focus</span>
+                <span className="sm:hidden">Focus</span>
+              </Button>
+            }
+          />
+
+          <PdfUploadDialog
+            topicId={topicId}
+            topicName={topic.name}
+            triggerButton={
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 border-indigo-500/30 hover:border-indigo-500 bg-indigo-500/5 hover:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 text-xs h-8.5 px-2.5 sm:px-3 shadow-xs cursor-pointer"
+              >
+                <FileUp className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                <span className="hidden sm:inline">Import PDF</span>
+                <span className="sm:hidden">PDF</span>
+              </Button>
+            }
+          />
+
+          <FeynmanEvaluatorDialog
+            topicName={topic.name}
+            triggerButton={
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 border-purple-500/30 hover:border-purple-500 bg-purple-500/5 hover:bg-purple-500/10 text-purple-700 dark:text-purple-300 text-xs h-8.5 px-2.5 sm:px-3 shadow-xs cursor-pointer"
+              >
+                <Brain className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                <span className="hidden sm:inline">Feynman AI</span>
+                <span className="sm:hidden">AI</span>
+              </Button>
+            }
+          />
+
           <Button
             variant="outline"
             size="sm"
             onClick={() => setIsDeleteDialogOpen(true)}
-            className="text-destructive border-destructive/20 hover:bg-destructive/10 hover:text-destructive text-xs h-9 cursor-pointer"
+            className="text-destructive border-destructive/20 hover:bg-destructive/10 hover:text-destructive text-xs h-8.5 px-2.5 sm:px-3 cursor-pointer shrink-0"
+            title="Delete Topic"
           >
-            <Trash2 className="h-3.5 w-3.5 mr-1" />
-            Delete
+            <Trash2 className="h-3.5 w-3.5 sm:mr-1" />
+            <span className="hidden sm:inline">Delete</span>
           </Button>
         </div>
       </div>

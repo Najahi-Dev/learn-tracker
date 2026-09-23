@@ -22,11 +22,13 @@ import confetti from "canvas-confetti";
 interface FeynmanEvaluatorDialogProps {
   topicName: string;
   defaultConcept?: string;
+  triggerButton?: React.ReactNode;
 }
 
 export function FeynmanEvaluatorDialog({
   topicName,
   defaultConcept = "",
+  triggerButton,
 }: FeynmanEvaluatorDialogProps) {
   const [open, setOpen] = useState(false);
   const [concept, setConcept] = useState(defaultConcept);
@@ -84,10 +86,14 @@ export function FeynmanEvaluatorDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-1.5 border-indigo-500/30 hover:border-indigo-500 text-xs">
-          <Brain className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
-          <span>Feynman AI Grader</span>
-        </Button>
+        {triggerButton ? (
+          triggerButton
+        ) : (
+          <Button variant="outline" size="sm" className="gap-1.5 border-indigo-500/30 hover:border-indigo-500 text-xs">
+            <Brain className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+            <span>Feynman AI Grader</span>
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[620px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
