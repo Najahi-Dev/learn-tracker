@@ -564,16 +564,16 @@ export default function TopicDetailPage({
       </div>
 
       {/* Hero Workspace Banner Card */}
-      <div className="relative overflow-hidden rounded-2xl border border-border/80 bg-card p-6 shadow-xs space-y-6">
+      <div className="relative overflow-hidden rounded-2xl border border-border/80 bg-card p-4 sm:p-6 shadow-xs space-y-5 sm:space-y-6">
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
           <div className="space-y-2 flex-1">
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground break-words">
                 {topic.name}
               </h1>
 
               {/* Interactive Status Selector (Select2 Style) */}
-              <div className="w-48">
+              <div className="w-full sm:w-48 shrink-0">
                 <Select2Dropdown
                   options={[
                     {
@@ -1032,11 +1032,11 @@ export default function TopicDetailPage({
                           </div>
                         </div>
                       ) : (
-                        <div className="flex items-center justify-between p-3.5 sm:p-4 gap-3">
-                          <div className="flex items-center gap-1.5 sm:gap-2.5 flex-1 min-w-0 pr-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 sm:p-4 gap-3">
+                          <div className="flex items-start sm:items-center gap-1.5 sm:gap-2.5 flex-1 min-w-0 pr-0 sm:pr-2">
                             {/* Drag Handle */}
                             <div
-                              className="text-muted-foreground/40 hover:text-foreground cursor-grab active:cursor-grabbing p-1 -ml-1 rounded touch-none transition-colors"
+                              className="text-muted-foreground/40 hover:text-foreground cursor-grab active:cursor-grabbing p-1 -ml-1 rounded touch-none transition-colors shrink-0 mt-0.5 sm:mt-0"
                               title="Drag to reorder position"
                             >
                               <GripVertical className="h-4 w-4" />
@@ -1046,7 +1046,7 @@ export default function TopicDetailPage({
                             <button
                               type="button"
                               onClick={() => toggleExpandTask(task._id)}
-                              className="text-muted-foreground hover:text-primary transition-colors p-1 rounded-md hover:bg-muted cursor-pointer shrink-0"
+                              className="text-muted-foreground hover:text-primary transition-colors p-1 rounded-md hover:bg-muted cursor-pointer shrink-0 mt-0.5 sm:mt-0"
                               title={isExpanded ? "Collapse subtasks" : "Expand subtasks"}
                             >
                               <ChevronRight
@@ -1062,7 +1062,7 @@ export default function TopicDetailPage({
                               onCheckedChange={() => handleToggleTask(task._id, task.status)}
                               id={`task-${task._id}`}
                               aria-label={`Mark task ${task.title} as ${isDone ? "incomplete" : "complete"}`}
-                              className="h-4.5 w-4.5 rounded-md shrink-0"
+                              className="h-4.5 w-4.5 rounded-md shrink-0 mt-1 sm:mt-0"
                             />
 
                             {/* Title & Metadata */}
@@ -1070,7 +1070,7 @@ export default function TopicDetailPage({
                               <div className="flex items-center gap-2 flex-wrap">
                                 <label
                                   htmlFor={`task-${task._id}`}
-                                  className={`text-sm cursor-pointer select-none truncate ${
+                                  className={`text-sm cursor-pointer select-none break-words ${
                                     isDone ? "line-through text-muted-foreground" : "font-semibold text-foreground"
                                   }`}
                                 >
@@ -1118,7 +1118,7 @@ export default function TopicDetailPage({
                           </div>
 
                           {/* Right Actions */}
-                          <div className="flex items-center gap-1.5 shrink-0">
+                          <div className="flex items-center justify-between sm:justify-end gap-1.5 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/40 pl-6 sm:pl-0">
                             {task.priority && (
                               <span
                                 className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
@@ -1133,37 +1133,39 @@ export default function TopicDetailPage({
                               </span>
                             )}
 
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleToggleScheduled(task)}
-                              title={isScheduled ? "Remove from Daily Planner" : "Add to Daily Planner"}
-                              className={`h-8 w-8 rounded-lg cursor-pointer ${
-                                isScheduled ? "text-amber-500 bg-amber-500/10" : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                              }`}
-                            >
-                              <Star className={`h-4 w-4 ${isScheduled ? "fill-amber-500" : ""}`} />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleToggleScheduled(task)}
+                                title={isScheduled ? "Remove from Daily Planner" : "Add to Daily Planner"}
+                                className={`h-8 w-8 rounded-lg cursor-pointer ${
+                                  isScheduled ? "text-amber-500 bg-amber-500/10" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                                }`}
+                              >
+                                <Star className={`h-4 w-4 ${isScheduled ? "fill-amber-500" : ""}`} />
+                              </Button>
 
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleStartEditTask(task)}
-                              className="h-8 w-8 rounded-lg text-muted-foreground opacity-70 group-hover:opacity-100 hover:text-primary hover:bg-primary/10 cursor-pointer"
-                              title="Edit milestone"
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleStartEditTask(task)}
+                                className="h-8 w-8 rounded-lg text-muted-foreground opacity-90 sm:opacity-70 sm:group-hover:opacity-100 hover:text-primary hover:bg-primary/10 cursor-pointer"
+                                title="Edit milestone"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
 
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDeleteTask(task._id)}
-                              className="h-8 w-8 rounded-lg text-muted-foreground opacity-70 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10 cursor-pointer"
-                              aria-label="Delete milestone"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeleteTask(task._id)}
+                                className="h-8 w-8 rounded-lg text-muted-foreground opacity-90 sm:opacity-70 sm:group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10 cursor-pointer"
+                                aria-label="Delete milestone"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -1311,14 +1313,14 @@ export default function TopicDetailPage({
                                       </label>
                                     </div>
 
-                                    <div className="flex items-center gap-0.5 opacity-0 group-hover/sub:opacity-100 transition-opacity">
+                                    <div className="flex items-center gap-0.5 opacity-90 sm:opacity-0 sm:group-hover/sub:opacity-100 transition-opacity">
                                       <button
                                         type="button"
                                         onClick={() => handleStartEditSubtask(sub)}
                                         className="text-muted-foreground hover:text-primary p-1 rounded transition-colors cursor-pointer"
                                         title="Edit subtask"
                                       >
-                                        <Pencil className="h-3 w-3" />
+                                        <Pencil className="h-3.5 w-3.5" />
                                       </button>
                                       <button
                                         type="button"
@@ -1326,7 +1328,7 @@ export default function TopicDetailPage({
                                         className="text-muted-foreground hover:text-destructive p-1 rounded transition-colors cursor-pointer"
                                         title="Delete subtask"
                                       >
-                                        <Trash2 className="h-3 w-3" />
+                                        <Trash2 className="h-3.5 w-3.5" />
                                       </button>
                                     </div>
                                   </div>

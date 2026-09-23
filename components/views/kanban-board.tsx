@@ -42,6 +42,7 @@ export function KanbanBoard({ topics }: KanbanBoardProps) {
   const [draggedTopicId, setDraggedTopicId] = useState<string | null>(null);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [activeDropCol, setActiveDropCol] = useState<string | null>(null);
+  const [mobileColFilter, setMobileColFilter] = useState<string>("all");
 
   const updateTopicStatus = useMutation(api.topics.updateTopicStatus);
   const updateTaskStatus = useMutation(api.tasks.updateTaskStatus);
@@ -186,41 +187,70 @@ export function KanbanBoard({ topics }: KanbanBoardProps) {
 
   return (
     <div className="space-y-4">
-      {/* Board Mode Toggle */}
-      <div className="flex items-center justify-between">
-        <div className="inline-flex rounded-xl border border-border bg-muted/40 p-1">
+      {/* Board Mode Toggle & Mobile Column Filter */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="inline-flex rounded-xl border border-border bg-muted/40 p-1 w-full sm:w-auto">
           <button
             onClick={() => setBoardMode("topics")}
-            className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
               boardMode === "topics"
                 ? "bg-background text-foreground shadow-xs"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
             <BookOpen className="h-3.5 w-3.5 text-primary" />
-            <span>Topics Board ({topics.length})</span>
+            <span>Topics ({topics.length})</span>
           </button>
           <button
             onClick={() => setBoardMode("tasks")}
-            className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
               boardMode === "tasks"
                 ? "bg-background text-foreground shadow-xs"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
             <CheckSquare className="h-3.5 w-3.5 text-primary" />
-            <span>Tasks / Milestones ({allTasks?.length ?? 0})</span>
+            <span>Tasks ({allTasks?.length ?? 0})</span>
           </button>
         </div>
 
-        <span className="text-xs text-muted-foreground hidden sm:inline-flex items-center gap-1.5">
+        {/* Mobile Column Quick Filter */}
+        <div className="flex md:hidden items-center gap-1.5 overflow-x-auto pb-1">
+          <button
+            onClick={() => setMobileColFilter("all")}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
+              mobileColFilter === "all"
+                ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                : "bg-muted text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            All Columns
+          </button>
+          {columns.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setMobileColFilter(c.id)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
+                mobileColFilter === c.id
+                  ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                  : "bg-muted text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {c.title.split("/")[0].trim()}
+            </button>
+          ))}
+        </div>
+
+        <span className="text-xs text-muted-foreground hidden lg:inline-flex items-center gap-1.5">
           <GripVertical className="h-3.5 w-3.5" /> Drag & drop cards between columns to update status
         </span>
       </div>
 
       {/* 3-Column Kanban Board */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {columns.map((col) => {
+        {columns
+          .filter((col) => mobileColFilter === "all" || mobileColFilter === col.id)
+          .map((col) => {
           const isDraggingOver = activeDropCol === col.id;
 
           if (boardMode === "topics") {

@@ -39,8 +39,8 @@ export function FloatingFocusBar() {
   if (!shouldShow) return null;
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
-      <div className="flex items-center gap-3 rounded-2xl border border-border/80 bg-background/95 p-2.5 pl-4 shadow-2xl backdrop-blur-md transition-all hover:border-primary/50">
+    <div className="fixed bottom-4 right-3 left-3 sm:left-auto sm:right-5 sm:bottom-5 z-50 flex justify-center sm:block animate-in fade-in slide-in-from-bottom-4 duration-300 pointer-events-none">
+      <div className="pointer-events-auto flex items-center justify-between sm:justify-start gap-3 rounded-2xl border border-border/80 bg-background/95 p-2.5 pl-4 shadow-2xl backdrop-blur-md transition-all hover:border-primary/50 max-w-full">
         {/* Mode & Pulse Indicator */}
         <div
           className="flex items-center gap-2 cursor-pointer"
