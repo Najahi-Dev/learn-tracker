@@ -17,6 +17,7 @@ export const getUserAnalytics = query({
         xp: 0,
         level: 1,
         activityData: [],
+        badges: [],
       };
     }
 
@@ -62,7 +63,6 @@ export const getUserAnalytics = query({
     let longestStreak = 0;
     let tempStreak = 0;
 
-    // Check today and yesterday
     const todayStr = formatDate(today);
     const yesterday = new Date();
     yesterday.setDate(today.getDate() - 1);
@@ -86,7 +86,7 @@ export const getUserAnalytics = query({
       }
     }
 
-    // Calculate longest streak across history
+    // Calculate longest streak
     const sortedDates = Array.from(activityMap.keys()).sort();
     if (sortedDates.length > 0) {
       tempStreak = 1;
@@ -111,6 +111,58 @@ export const getUserAnalytics = query({
     const xp = totalCompletedTasks * 25 + topics.length * 50;
     const level = Math.floor(xp / 100) + 1;
 
+    // Badges definitions & unlocked criteria
+    const badges = [
+      {
+        id: "first_milestone",
+        title: "First Step",
+        description: "Completed your first learning milestone",
+        icon: "🌱",
+        unlocked: totalCompletedTasks >= 1,
+        progress: `${Math.min(totalCompletedTasks, 1)}/1`,
+      },
+      {
+        id: "momentum_5",
+        title: "Building Momentum",
+        description: "Completed 5 learning milestones",
+        icon: "⚡",
+        unlocked: totalCompletedTasks >= 5,
+        progress: `${Math.min(totalCompletedTasks, 5)}/5`,
+      },
+      {
+        id: "streak_3",
+        title: "Habit Builder",
+        description: "Maintained a 3-day active study streak",
+        icon: "🔥",
+        unlocked: longestStreak >= 3,
+        progress: `${Math.min(longestStreak, 3)}/3 days`,
+      },
+      {
+        id: "streak_7",
+        title: "Relentless Focus",
+        description: "Maintained a 7-day study streak",
+        icon: "👑",
+        unlocked: longestStreak >= 7,
+        progress: `${Math.min(longestStreak, 7)}/7 days`,
+      },
+      {
+        id: "polymath_3",
+        title: "Polymath",
+        description: "Created 3 learning topics",
+        icon: "📚",
+        unlocked: topics.length >= 3,
+        progress: `${Math.min(topics.length, 3)}/3`,
+      },
+      {
+        id: "scholar_25",
+        title: "Mastery Scholar",
+        description: "Completed 25 milestones across topics",
+        icon: "🏆",
+        unlocked: totalCompletedTasks >= 25,
+        progress: `${Math.min(totalCompletedTasks, 25)}/25`,
+      },
+    ];
+
     return {
       currentStreak,
       longestStreak,
@@ -119,6 +171,7 @@ export const getUserAnalytics = query({
       xp,
       level,
       activityData,
+      badges,
     };
   },
 });

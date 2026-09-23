@@ -23,6 +23,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { MarkdownNotes } from "@/components/notes/markdown-notes";
+import { FeynmanEvaluatorDialog } from "@/components/ai/feynman-evaluator-dialog";
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
 
@@ -211,7 +212,7 @@ export default function TopicDetailPage({
   }[topic.status];
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="space-y-6 w-full">
       {/* Back Button & Actions */}
       <div className="flex items-center justify-between">
         <Button
@@ -226,15 +227,18 @@ export default function TopicDetailPage({
           </Link>
         </Button>
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleDeleteTopic}
-          className="text-destructive border-destructive/20 hover:bg-destructive/10 hover:text-destructive text-xs"
-        >
-          <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-          Delete Topic
-        </Button>
+        <div className="flex items-center gap-2">
+          <FeynmanEvaluatorDialog topicName={topic.name} />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDeleteTopic}
+            className="text-destructive border-destructive/20 hover:bg-destructive/10 hover:text-destructive text-xs"
+          >
+            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+            Delete Topic
+          </Button>
+        </div>
       </div>
 
       {/* Topic Info Card */}

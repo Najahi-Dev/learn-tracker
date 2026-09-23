@@ -7,6 +7,8 @@ import { CreateTopicDialog } from "@/components/create-topic-dialog";
 import { AiRoadmapDialog } from "@/components/ai/ai-roadmap-dialog";
 import { StreakBadge } from "@/components/analytics/streak-badge";
 import { ActivityHeatmap } from "@/components/analytics/activity-heatmap";
+import { AchievementBadges } from "@/components/analytics/achievement-badges";
+import { ViewSwitcher } from "@/components/views/view-switcher";
 import {
   BookOpen,
   Search,
@@ -33,11 +35,11 @@ export default function DashboardPage() {
   }, [topics, searchQuery, statusFilter]);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 w-full">
       {/* Top Header / Action Bar */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl text-foreground">
             My Learning Topics
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -45,6 +47,7 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
+          <ViewSwitcher />
           <AiRoadmapDialog />
           <CreateTopicDialog />
         </div>
@@ -142,10 +145,17 @@ export default function DashboardPage() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filteredTopics.map((topic) => (
             <TopicCard key={topic._id} topic={topic} />
           ))}
+        </div>
+      )}
+
+      {/* Achievement Badges Section */}
+      {analytics && analytics.badges && analytics.badges.length > 0 && (
+        <div className="pt-4">
+          <AchievementBadges badges={analytics.badges} />
         </div>
       )}
     </div>
