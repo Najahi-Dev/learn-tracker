@@ -21,6 +21,9 @@ import {
   ChevronRight,
   Sparkles,
   Zap,
+  Clock,
+  CalendarDays,
+  Flame,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +35,7 @@ import { FeynmanEvaluatorDialog } from "@/components/ai/feynman-evaluator-dialog
 import { ZenFocusModal } from "@/components/focus/zen-focus-modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Select2Dropdown, type Select2Option } from "@/components/ui/select2-dropdown";
+import { FlatpickrDatePicker } from "@/components/ui/flatpickr-date-picker";
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
 
@@ -44,6 +48,7 @@ export interface TaskItem {
   title: string;
   status: "not_started" | "in_progress" | "done";
   priority?: "low" | "medium" | "high";
+  dueDate?: number;
   scheduledForToday?: boolean;
   createdAt: number;
   completedAt?: number;
@@ -82,10 +87,14 @@ export default function TopicDetailPage({
   const deleteTopic = useMutation(api.topics.deleteTopic);
 
   const [activeTab, setActiveTab] = useState<"tasks" | "notes">("tasks");
-  const [taskFilter, setTaskFilter] = useState<"all" | "pending" | "done" | "high">("all");
+  const [taskFilter, setTaskFilter] = useState<"all" | "pending" | "done" | "high" | "deadlines">("all");
   const [taskSearch, setTaskSearch] = useState("");
+
+  // Milestone Creation Form State
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
+  const [deadlineDate, setDeadlineDate] = useState<Date | null>(null);
+  const [scheduleToday, setScheduleToday] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [taskError, setTaskError] = useState<string | null>(null);
 
@@ -101,8 +110,12 @@ export default function TopicDetailPage({
         title: newTaskTitle.trim(),
         status: "not_started",
         priority,
+        dueDate: deadlineDate ? deadlineDate.getTime() : undefined,
+        scheduledForToday: scheduleToday,
       });
       setNewTaskTitle("");
+      setDeadlineDate(null);
+      setScheduleToday(false);
       toast.success("Milestone added to topic!");
     } catch (err: unknown) {
       console.error("Failed to add task:", err);
@@ -202,6 +215,51 @@ export default function TopicDetailPage({
     }
   };
 
+  // Helper to compute deadline display & urgency
+  const getDeadlineInfo = (dueDate?: number, isDone?: boolean) => {
+    if (!dueDate) return null;
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const due = new Date(dueDate);
+    due.setHours(0, 0, 0, 0);
+
+    const diffDays = Math.round((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (isDone) {
+      return {
+        label: `Target: ${due.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`,
+        isOverdue: false,
+        className: "text-muted-foreground/60 border-border/40",
+      };
+    }
+
+    if (diffDays < 0) {
+      return {
+        label: `Overdue by ${Math.abs(diffDays)}d (${due.toLocaleDateString(undefined, { month: "short", day: "numeric" })})`,
+        isOverdue: true,
+        className: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20 font-semibold",
+      };
+    } else if (diffDays === 0) {
+      return {
+        label: "Due Today",
+        isOverdue: false,
+        className: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 font-semibold",
+      };
+    } else if (diffDays === 1) {
+      return {
+        label: "Due Tomorrow",
+        isOverdue: false,
+        className: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20 font-medium",
+      };
+    } else {
+      return {
+        label: `Due in ${diffDays}d (${due.toLocaleDateString(undefined, { month: "short", day: "numeric" })})`,
+        isOverdue: false,
+        className: "bg-muted/40 text-muted-foreground border-border/60 font-medium",
+      };
+    }
+  };
+
   // Filtered tasks calculation
   const filteredTasks = useMemo(() => {
     if (!tasks) return [];
@@ -212,6 +270,7 @@ export default function TopicDetailPage({
       if (taskFilter === "pending") return task.status !== "done";
       if (taskFilter === "done") return task.status === "done";
       if (taskFilter === "high") return task.priority === "high";
+      if (taskFilter === "deadlines") return !!task.dueDate;
       return true;
     });
   }, [tasks, taskFilter, taskSearch]);
@@ -400,19 +459,46 @@ export default function TopicDetailPage({
       {/* Tab 1: Tasks & Milestones */}
       {activeTab === "tasks" && (
         <div className="space-y-5">
-          {/* Add Task Input Section */}
-          <div className="rounded-xl border border-border/80 bg-card p-4 shadow-xs space-y-3">
-            <form onSubmit={handleAddTask} className="flex flex-col sm:flex-row gap-2.5">
-              <Input
-                placeholder="Add a milestone or study task... (Press Enter to add)"
-                value={newTaskTitle}
-                onChange={(e) => setNewTaskTitle(e.target.value)}
-                disabled={isSubmitting}
-                className="flex-1 h-10"
-              />
-
+          {/* Executive Milestone Creator with Deadline & Select2 */}
+          <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-44">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <Plus className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">Add New Learning Milestone</h3>
+                  <p className="text-[11px] text-muted-foreground">Assign targets, priority levels, and track deadlines.</p>
+                </div>
+              </div>
+            </div>
+
+            <form onSubmit={handleAddTask} className="space-y-3 pt-1">
+              {/* Top Row: Milestone Title */}
+              <div>
+                <Input
+                  placeholder="What milestone, concept, or project do you want to accomplish?"
+                  value={newTaskTitle}
+                  onChange={(e) => setNewTaskTitle(e.target.value)}
+                  disabled={isSubmitting}
+                  className="h-10 text-sm font-medium"
+                />
+              </div>
+
+              {/* Bottom Row: Flatpickr Deadline + Select2 Priority + Today Schedule Toggle + Submit Button */}
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Flatpickr Target Deadline Picker */}
+                <div className="w-full sm:w-56">
+                  <FlatpickrDatePicker
+                    value={deadlineDate}
+                    onChange={(d) => setDeadlineDate(d)}
+                    placeholder="Target Deadline (Optional)"
+                    minDate="today"
+                  />
+                </div>
+
+                {/* Select2 Priority Picker */}
+                <div className="w-full sm:w-44">
                   <Select2Dropdown
                     options={[
                       {
@@ -437,10 +523,25 @@ export default function TopicDetailPage({
                   />
                 </div>
 
+                {/* Schedule for Today Toggle Pill */}
+                <button
+                  type="button"
+                  onClick={() => setScheduleToday(!scheduleToday)}
+                  className={`flex items-center gap-1.5 h-9 rounded-md border px-3 text-xs font-medium transition-all cursor-pointer ${
+                    scheduleToday
+                      ? "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold"
+                      : "border-input bg-background text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Star className={`h-3.5 w-3.5 ${scheduleToday ? "fill-amber-500" : ""}`} />
+                  <span>{scheduleToday ? "Focus Queue: Active" : "Add to Today's Plan"}</span>
+                </button>
+
+                {/* Add Milestone Button */}
                 <Button
                   type="submit"
                   disabled={isSubmitting || !newTaskTitle.trim()}
-                  className="gap-1.5 shrink-0 h-9 font-semibold text-xs cursor-pointer"
+                  className="gap-1.5 h-9 px-4 font-semibold text-xs cursor-pointer ml-auto"
                 >
                   {isSubmitting ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -499,6 +600,16 @@ export default function TopicDetailPage({
               >
                 High Priority
               </button>
+              <button
+                onClick={() => setTaskFilter("deadlines")}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-all cursor-pointer ${
+                  taskFilter === "deadlines"
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "bg-muted text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                With Deadlines
+              </button>
             </div>
 
             <div className="relative w-full sm:w-60">
@@ -524,8 +635,8 @@ export default function TopicDetailPage({
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {taskSearch || taskFilter !== "all"
-                    ? "Try clearing your search or switching to 'All'."
-                    : "Add your first milestone above to start mastering this topic."}
+                    ? "Try clearing your search or switching filters."
+                    : "Use the form above to add milestones and set target deadlines."}
                 </p>
               </div>
             ) : (
@@ -533,6 +644,7 @@ export default function TopicDetailPage({
                 {filteredTasks.map((task) => {
                   const isDone = task.status === "done";
                   const isScheduled = !!task.scheduledForToday;
+                  const deadlineInfo = getDeadlineInfo(task.dueDate, isDone);
 
                   return (
                     <div
@@ -560,11 +672,29 @@ export default function TopicDetailPage({
                           >
                             {task.title}
                           </label>
-                          {task.completedAt && isDone && (
-                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-0.5">
-                              Completed {new Date(task.completedAt).toLocaleDateString()}
-                            </span>
-                          )}
+
+                          <div className="flex flex-wrap items-center gap-2 mt-1">
+                            {/* Deadline Badge */}
+                            {deadlineInfo && (
+                              <span
+                                className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] ${deadlineInfo.className}`}
+                              >
+                                {deadlineInfo.isOverdue ? (
+                                  <Clock className="h-3 w-3 text-red-500" />
+                                ) : (
+                                  <CalendarDays className="h-3 w-3" />
+                                )}
+                                <span>{deadlineInfo.label}</span>
+                              </span>
+                            )}
+
+                            {/* Completed Timestamp */}
+                            {task.completedAt && isDone && (
+                              <span className="text-[10px] text-emerald-600 dark:text-emerald-400">
+                                Completed {new Date(task.completedAt).toLocaleDateString()}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -588,7 +718,7 @@ export default function TopicDetailPage({
                           size="icon"
                           onClick={() => handleToggleScheduled(task)}
                           title={isScheduled ? "Remove from Daily Planner" : "Add to Daily Planner"}
-                          className={`h-8 w-8 rounded-lg ${
+                          className={`h-8 w-8 rounded-lg cursor-pointer ${
                             isScheduled ? "text-amber-500 bg-amber-500/10" : "text-muted-foreground hover:text-foreground hover:bg-muted"
                           }`}
                         >
@@ -599,7 +729,7 @@ export default function TopicDetailPage({
                           variant="ghost"
                           size="icon"
                           onClick={() => handleDeleteTask(task._id)}
-                          className="h-8 w-8 rounded-lg text-muted-foreground opacity-70 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10"
+                          className="h-8 w-8 rounded-lg text-muted-foreground opacity-70 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10 cursor-pointer"
                           aria-label="Delete milestone"
                         >
                           <Trash2 className="h-4 w-4" />
