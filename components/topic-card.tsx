@@ -22,6 +22,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreVertical, Trash2, ArrowRight, CheckCircle2 } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { toast } from "sonner";
 
 import type { Id } from "@/convex/_generated/dataModel";
 
@@ -43,6 +45,7 @@ interface TopicCardProps {
 }
 
 export function TopicCard({ topic }: TopicCardProps) {
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const deleteTopic = useMutation(api.topics.deleteTopic);
 
@@ -50,18 +53,22 @@ export function TopicCard({ topic }: TopicCardProps) {
   const doneTasks = topic.doneTasks ?? 0;
   const progress = topic.progress ?? (totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0);
 
-  const handleDelete = async (e: React.MouseEvent) => {
+  const handleOpenDelete = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (window.confirm(`Are you sure you want to delete "${topic.name}" and all its tasks?`)) {
-      try {
-        setIsDeleting(true);
-        await deleteTopic({ topicId: topic._id });
-      } catch (err) {
-        console.error("Failed to delete topic:", err);
-      } finally {
-        setIsDeleting(false);
-      }
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      setIsDeleting(true);
+      await deleteTopic({ topicId: topic._id });
+      toast.info(`Deleted topic "${topic.name}"`);
+    } catch (err) {
+      console.error("Failed to delete topic:", err);
+      toast.error("Failed to delete topic");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -114,9 +121,9 @@ export function TopicCard({ topic }: TopicCardProps) {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem
-                  onClick={handleDelete}
+                  onClick={handleOpenDelete}
                   disabled={isDeleting}
-                  className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                  className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete Topic
@@ -148,6 +155,16 @@ export function TopicCard({ topic }: TopicCardProps) {
           View Tasks <ArrowRight className="ml-1 h-3.5 w-3.5" />
         </span>
       </CardFooter>
+
+      {/* Professional Confirm Modal for Deleting Topic from Card */}
+      <ConfirmDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        title={`Delete "${topic.name}"?`}
+        description="Are you sure you want to delete this topic and all its learning milestones? This action cannot be undone."
+        confirmText="Delete Topic"
+        onConfirm={handleConfirmDelete}
+      />
     </Card>
   );
 }

@@ -10,6 +10,7 @@
 
 import type * as ai from "../ai.js";
 import type * as analytics from "../analytics.js";
+import type * as notes from "../notes.js";
 import type * as reviews from "../reviews.js";
 import type * as tasks from "../tasks.js";
 import type * as topics from "../topics.js";
@@ -23,6 +24,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   ai: typeof ai;
   analytics: typeof analytics;
+  notes: typeof notes;
   reviews: typeof reviews;
   tasks: typeof tasks;
   topics: typeof topics;

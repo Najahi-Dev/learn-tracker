@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import {
@@ -11,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { FlatpickrDatePicker } from "@/components/ui/flatpickr-date-picker";
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
 import Link from "next/link";
@@ -28,6 +30,7 @@ interface PlannerTask {
 }
 
 export default function DailyPlannerPage() {
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const todayTasks = useQuery(api.tasks.getTodayTasks) as PlannerTask[] | undefined;
   const updateTaskStatus = useMutation(api.tasks.updateTaskStatus);
   const toggleTaskScheduled = useMutation(api.tasks.toggleTaskScheduled);
@@ -66,11 +69,13 @@ export default function DailyPlannerPage() {
     }
   };
 
-  const todayDateFormatted = new Date().toLocaleDateString(undefined, {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
+  const dateFormatted = selectedDate
+    ? selectedDate.toLocaleDateString(undefined, {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      })
+    : "All Scheduled Milestones";
 
   const completedCount = todayTasks?.filter((t) => t.status === "done").length || 0;
   const totalCount = todayTasks?.length || 0;
@@ -85,14 +90,27 @@ export default function DailyPlannerPage() {
             <span>Daily Focus Plan</span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl mt-0.5">
-            {todayDateFormatted}
+            {dateFormatted}
           </h1>
           <p className="text-xs text-muted-foreground mt-1">
             Focus on high-priority milestones to build steady learning momentum.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="w-56">
+            <FlatpickrDatePicker
+              value={selectedDate}
+              onChange={(date) => {
+                setSelectedDate(date);
+                if (date) {
+                  toast.info(`Viewing plan for ${date.toLocaleDateString()}`);
+                }
+              }}
+              placeholder="Pick a plan date..."
+            />
+          </div>
+
           <div className="rounded-xl border border-border bg-card px-4 py-2 text-right shadow-xs">
             <span className="text-xs text-muted-foreground">Today&apos;s Progress</span>
             <p className="text-lg font-bold text-foreground">

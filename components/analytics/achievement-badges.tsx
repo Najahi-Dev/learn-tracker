@@ -1,6 +1,6 @@
 "use client";
 
-import { Award, Lock, CheckCircle2 } from "lucide-react";
+import { Award, Lock, CheckCircle2, Sprout, Zap, Flame, Crown, BookOpen, Trophy } from "lucide-react";
 
 export interface BadgeItem {
   id: string;
@@ -17,6 +17,25 @@ interface AchievementBadgesProps {
 
 export function AchievementBadges({ badges }: AchievementBadgesProps) {
   const unlockedCount = badges.filter((b) => b.unlocked).length;
+
+  const renderBadgeIcon = (iconName: string) => {
+    switch (iconName) {
+      case "sprout":
+        return <Sprout className="h-6 w-6 text-emerald-500" />;
+      case "zap":
+        return <Zap className="h-6 w-6 text-amber-500" />;
+      case "flame":
+        return <Flame className="h-6 w-6 text-orange-500" />;
+      case "crown":
+        return <Crown className="h-6 w-6 text-yellow-500" />;
+      case "book-open":
+        return <BookOpen className="h-6 w-6 text-blue-500" />;
+      case "trophy":
+        return <Trophy className="h-6 w-6 text-purple-500" />;
+      default:
+        return <Award className="h-6 w-6 text-primary" />;
+    }
+  };
 
   return (
     <div className="rounded-xl border border-border bg-card p-5 shadow-xs space-y-4">
@@ -40,8 +59,8 @@ export function AchievementBadges({ badges }: AchievementBadgesProps) {
                 : "border-border/60 bg-muted/20 opacity-50 grayscale"
             }`}
           >
-            <div className="relative mb-2">
-              <span className="text-2xl select-none">{badge.icon}</span>
+            <div className="relative mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-background border border-border/60 shadow-2xs">
+              {renderBadgeIcon(badge.icon)}
               {badge.unlocked ? (
                 <div className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs">
                   <CheckCircle2 className="h-3 w-3" />

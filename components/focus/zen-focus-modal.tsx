@@ -15,6 +15,8 @@ import {
   RotateCcw,
   Sparkles,
   Maximize2,
+  CloudRain,
+  Waves,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -223,23 +225,25 @@ export function ZenFocusModal() {
               <span className="text-[11px] text-muted-foreground">Ambient sound:</span>
               <button
                 onClick={() => setAmbientSound(ambientSound === "rain" ? "none" : "rain")}
-                className={`text-xs px-2.5 py-1 rounded-md border transition-colors ${
+                className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border transition-colors cursor-pointer ${
                   ambientSound === "rain"
                     ? "border-primary bg-primary/10 text-primary font-medium"
                     : "border-border text-muted-foreground hover:bg-muted"
                 }`}
               >
-                🌧️ Rain
+                <CloudRain className="h-3.5 w-3.5" />
+                <span>Rain</span>
               </button>
               <button
                 onClick={() => setAmbientSound(ambientSound === "waves" ? "none" : "waves")}
-                className={`text-xs px-2.5 py-1 rounded-md border transition-colors ${
+                className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border transition-colors cursor-pointer ${
                   ambientSound === "waves"
                     ? "border-primary bg-primary/10 text-primary font-medium"
                     : "border-border text-muted-foreground hover:bg-muted"
                 }`}
               >
-                🌊 Waves
+                <Waves className="h-3.5 w-3.5" />
+                <span>Waves</span>
               </button>
             </div>
           </div>

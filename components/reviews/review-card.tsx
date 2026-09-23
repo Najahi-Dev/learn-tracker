@@ -108,36 +108,36 @@ export function ReviewCard({ review, onReviewed }: ReviewCardProps) {
               size="sm"
               disabled={isSubmitting}
               onClick={() => handleRating("again")}
-              className="text-xs border-red-500/30 hover:bg-red-500/10 hover:text-red-600"
+              className="text-xs border-red-500/30 hover:bg-red-500/10 hover:text-red-600 cursor-pointer"
             >
-              🔄 Again (1d)
+              Again (1d)
             </Button>
             <Button
               variant="outline"
               size="sm"
               disabled={isSubmitting}
               onClick={() => handleRating("hard")}
-              className="text-xs border-amber-500/30 hover:bg-amber-500/10 hover:text-amber-600"
+              className="text-xs border-amber-500/30 hover:bg-amber-500/10 hover:text-amber-600 cursor-pointer"
             >
-              ⚡ Hard ({Math.max(1, Math.round(review.intervalDays * 1.2))}d)
+              Hard ({Math.max(1, Math.round(review.intervalDays * 1.2))}d)
             </Button>
             <Button
               variant="outline"
               size="sm"
               disabled={isSubmitting}
               onClick={() => handleRating("good")}
-              className="text-xs border-blue-500/30 hover:bg-blue-500/10 hover:text-blue-600"
+              className="text-xs border-blue-500/30 hover:bg-blue-500/10 hover:text-blue-600 cursor-pointer"
             >
-              👍 Good ({Math.round(review.intervalDays * review.easeFactor)}d)
+              Good ({Math.round(review.intervalDays * review.easeFactor)}d)
             </Button>
             <Button
               variant="default"
               size="sm"
               disabled={isSubmitting}
               onClick={() => handleRating("easy")}
-              className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
             >
-              🎯 Easy ({Math.round(review.intervalDays * review.easeFactor * 1.3)}d)
+              Easy ({Math.round(review.intervalDays * review.easeFactor * 1.3)}d)
             </Button>
           </div>
         ) : (

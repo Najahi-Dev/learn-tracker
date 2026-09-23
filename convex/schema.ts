@@ -68,4 +68,15 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_user_date", ["userId", "date"]),
+
+  topic_notes: defineTable({
+    topicId: v.id("topics"),
+    userId: v.string(),
+    title: v.string(),
+    content: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_topic", ["topicId"])
+    .index("by_user", ["userId"]),
 });

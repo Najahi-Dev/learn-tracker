@@ -15,11 +15,13 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select2Dropdown } from "@/components/ui/select2-dropdown";
 
 export function CreateTopicDialog() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [status, setStatus] = useState<"not_started" | "in_progress" | "done">("not_started");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,10 +40,11 @@ export function CreateTopicDialog() {
       await createTopic({
         name: name.trim(),
         description: description.trim() || undefined,
-        status: "not_started",
+        status,
       });
       setName("");
       setDescription("");
+      setStatus("not_started");
       setOpen(false);
     } catch (err: unknown) {
       console.error("Failed to create topic:", err);
@@ -103,6 +106,34 @@ export function CreateTopicDialog() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 disabled={isLoading}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Initial Status
+              </label>
+              <Select2Dropdown
+                options={[
+                  {
+                    value: "not_started",
+                    label: "Not Started",
+                    icon: <div className="h-2 w-2 rounded-full bg-zinc-400" />,
+                  },
+                  {
+                    value: "in_progress",
+                    label: "In Progress",
+                    icon: <div className="h-2 w-2 rounded-full bg-blue-500" />,
+                  },
+                  {
+                    value: "done",
+                    label: "Mastered",
+                    icon: <div className="h-2 w-2 rounded-full bg-emerald-500" />,
+                  },
+                ]}
+                value={status}
+                onChange={(val) => setStatus(val as "not_started" | "in_progress" | "done")}
+                isSearchable={false}
               />
             </div>
             {error && <p className="text-xs text-destructive">{error}</p>}
