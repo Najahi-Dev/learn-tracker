@@ -4,11 +4,11 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { TopicCard, type TopicItem } from "@/components/topic-card";
 import { CreateTopicDialog } from "@/components/create-topic-dialog";
+import { AiRoadmapDialog } from "@/components/ai/ai-roadmap-dialog";
+import { StreakBadge } from "@/components/analytics/streak-badge";
+import { ActivityHeatmap } from "@/components/analytics/activity-heatmap";
 import {
   BookOpen,
-  CheckCircle2,
-  Clock,
-  Layers,
   Search,
   Loader2,
 } from "lucide-react";
@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 
 export default function DashboardPage() {
   const topics = useQuery(api.topics.getTopics) as TopicItem[] | undefined;
+  const analytics = useQuery(api.analytics.getUserAnalytics);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
@@ -31,15 +32,6 @@ export default function DashboardPage() {
     });
   }, [topics, searchQuery, statusFilter]);
 
-  const stats = useMemo(() => {
-    if (!topics) return { total: 0, inProgress: 0, done: 0 };
-    return {
-      total: topics.length,
-      inProgress: topics.filter((t: TopicItem) => t.status === "in_progress").length,
-      done: topics.filter((t: TopicItem) => t.status === "done").length,
-    };
-  }, [topics]);
-
   return (
     <div className="space-y-8">
       {/* Top Header / Action Bar */}
@@ -49,49 +41,32 @@ export default function DashboardPage() {
             My Learning Topics
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Organize skills, track milestones, and maintain continuous mastery.
+            Organize skills, track milestones, and build lasting retention.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <AiRoadmapDialog />
           <CreateTopicDialog />
         </div>
       </div>
 
-      {/* Overview Stats Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="flex items-center gap-4 rounded-xl border border-border bg-card p-4 shadow-xs">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <Layers className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-xs font-medium text-muted-foreground">Total Topics</p>
-            <p className="text-xl font-bold">{stats.total}</p>
-          </div>
-        </div>
+      {/* Streaks & Level XP Widget */}
+      {analytics && (
+        <StreakBadge
+          currentStreak={analytics.currentStreak}
+          longestStreak={analytics.longestStreak}
+          xp={analytics.xp}
+          level={analytics.level}
+        />
+      )}
 
-        <div className="flex items-center gap-4 rounded-xl border border-border bg-card p-4 shadow-xs">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
-            <Clock className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-xs font-medium text-muted-foreground">In Progress</p>
-            <p className="text-xl font-bold">{stats.inProgress}</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4 rounded-xl border border-border bg-card p-4 shadow-xs">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-            <CheckCircle2 className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-xs font-medium text-muted-foreground">Completed</p>
-            <p className="text-xl font-bold">{stats.done}</p>
-          </div>
-        </div>
-      </div>
+      {/* Activity Heatmap */}
+      {analytics && analytics.activityData && (
+        <ActivityHeatmap data={analytics.activityData} />
+      )}
 
       {/* Search & Filter Bar */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-2">
         <div className="relative w-full sm:w-72">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -147,7 +122,7 @@ export default function DashboardPage() {
           <p className="text-xs text-muted-foreground max-w-sm mt-1 mb-4">
             {searchQuery || statusFilter !== "all"
               ? "Try adjusting your search query or clear the filter to see all topics."
-              : "Create your first learning topic to start breaking down concepts and tracking tasks."}
+              : "Create your first learning topic or use AI Roadmap to generate a structured curriculum."}
           </p>
           {searchQuery || statusFilter !== "all" ? (
             <button
@@ -160,7 +135,10 @@ export default function DashboardPage() {
               Reset filters
             </button>
           ) : (
-            <CreateTopicDialog />
+            <div className="flex items-center gap-2">
+              <AiRoadmapDialog />
+              <CreateTopicDialog />
+            </div>
           )}
         </div>
       ) : (

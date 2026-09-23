@@ -23,10 +23,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MoreVertical, Trash2, ArrowRight, CheckCircle2 } from "lucide-react";
 
+import type { Id } from "@/convex/_generated/dataModel";
+
 export type TopicStatus = "not_started" | "in_progress" | "done";
 
 export interface TopicItem {
-  _id: string;
+  _id: Id<"topics">;
   name: string;
   description?: string;
   status: TopicStatus;

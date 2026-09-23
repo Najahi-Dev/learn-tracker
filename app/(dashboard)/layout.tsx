@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
-import { BookOpen, Layers } from "lucide-react";
+import { BookOpen, Layers, Calendar, BrainCircuit } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { CommandMenu } from "@/components/command-menu";
 
 export default function DashboardLayout({
   children,
@@ -21,10 +22,10 @@ export default function DashboardLayout({
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs">
                 <BookOpen className="h-4 w-4" />
               </div>
-              <span className="text-base">LearnTracker</span>
+              <span className="text-base font-bold">LearnTracker</span>
             </Link>
 
-            <nav className="hidden sm:flex items-center gap-4 text-sm font-medium">
+            <nav className="hidden md:flex items-center gap-5 text-sm font-medium">
               <Link
                 href="/dashboard"
                 className="flex items-center gap-1.5 text-foreground transition-colors hover:text-primary"
@@ -32,10 +33,27 @@ export default function DashboardLayout({
                 <Layers className="h-4 w-4 text-muted-foreground" />
                 Topics
               </Link>
+
+              <Link
+                href="/dashboard/planner"
+                className="flex items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <Calendar className="h-4 w-4" />
+                Daily Planner
+              </Link>
+
+              <Link
+                href="/dashboard/reviews"
+                className="flex items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <BrainCircuit className="h-4 w-4" />
+                Reviews
+              </Link>
             </nav>
           </div>
 
           <div className="flex items-center gap-3">
+            <CommandMenu />
             <ThemeToggle />
             <UserButton />
           </div>
