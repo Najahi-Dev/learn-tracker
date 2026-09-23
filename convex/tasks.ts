@@ -1,6 +1,11 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
+function getTodayDateString(): string {
+  const d = new Date();
+  return d.toISOString().split("T")[0];
+}
+
 export const getTasksByTopic = query({
   args: { topicId: v.id("topics") },
   handler: async (ctx, args) => {
@@ -9,7 +14,6 @@ export const getTasksByTopic = query({
       return [];
     }
 
-    // Verify ownership of the topic
     const topic = await ctx.db.get(args.topicId);
     if (!topic || topic.userId !== identity.subject) {
       return [];
@@ -25,6 +29,36 @@ export const getTasksByTopic = query({
   },
 });
 
+export const getTodayTasks = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return [];
+    }
+
+    const tasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
+      .collect();
+
+    // Filter tasks that are either explicitly scheduled for today or not completed yet
+    const todayTasks = await Promise.all(
+      tasks
+        .filter((t) => t.scheduledForToday || t.status === "in_progress")
+        .map(async (task) => {
+          const topic = await ctx.db.get(task.topicId);
+          return {
+            ...task,
+            topicName: topic?.name || "Unknown Topic",
+          };
+        })
+    );
+
+    return todayTasks;
+  },
+});
+
 export const createTask = mutation({
   args: {
     topicId: v.id("topics"),
@@ -36,6 +70,11 @@ export const createTask = mutation({
         v.literal("done")
       )
     ),
+    priority: v.optional(
+      v.union(v.literal("low"), v.literal("medium"), v.literal("high"))
+    ),
+    dueDate: v.optional(v.number()),
+    scheduledForToday: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -56,11 +95,13 @@ export const createTask = mutation({
       userId: identity.subject,
       title: args.title.trim(),
       status,
+      priority: args.priority ?? "medium",
+      dueDate: args.dueDate,
+      scheduledForToday: args.scheduledForToday ?? false,
       createdAt: now,
       completedAt: status === "done" ? now : undefined,
     });
 
-    // If topic was not_started and we're adding tasks, automatically set to in_progress if desired
     if (topic.status === "not_started") {
       await ctx.db.patch(args.topicId, { status: "in_progress" });
     }
@@ -90,28 +131,101 @@ export const updateTaskStatus = mutation({
     }
 
     const now = Date.now();
+    const isNowDone = args.status === "done";
+    const wasDone = task.status === "done";
+
     await ctx.db.patch(args.taskId, {
       status: args.status,
-      completedAt: args.status === "done" ? now : undefined,
+      completedAt: isNowDone ? now : undefined,
     });
 
-    // Optionally check if all tasks for this topic are done
+    // Update Activity Log & Spaced Repetition if task marked as done
+    if (isNowDone && !wasDone) {
+      const todayDate = getTodayDateString();
+      const existingLog = await ctx.db
+        .query("activity_logs")
+        .withIndex("by_user_date", (q) =>
+          q.eq("userId", identity.subject).eq("date", todayDate)
+        )
+        .first();
+
+      if (existingLog) {
+        await ctx.db.patch(existingLog._id, {
+          count: existingLog.count + 1,
+          completedTasks: existingLog.completedTasks + 1,
+        });
+      } else {
+        await ctx.db.insert("activity_logs", {
+          userId: identity.subject,
+          date: todayDate,
+          count: 1,
+          completedTasks: 1,
+        });
+      }
+
+      // Initialize spaced repetition review for this task if it doesn't exist
+      const existingReview = await ctx.db
+        .query("reviews")
+        .withIndex("by_task", (q) => q.eq("taskId", task._id))
+        .first();
+
+      if (!existingReview) {
+        // Schedule next review for tomorrow (1 day interval)
+        const oneDayMs = 24 * 60 * 60 * 1000;
+        await ctx.db.insert("reviews", {
+          taskId: task._id,
+          topicId: task.topicId,
+          userId: identity.subject,
+          nextReviewDate: now + oneDayMs,
+          intervalDays: 1,
+          easeFactor: 2.5,
+          lastReviewedAt: now,
+          repetitions: 1,
+        });
+      }
+    }
+
+    // Update Topic Status
     const allTopicTasks = await ctx.db
       .query("tasks")
       .withIndex("by_topic", (q) => q.eq("topicId", task.topicId))
       .collect();
 
     const otherTasks = allTopicTasks.filter((t) => t._id !== task._id);
-    const allDone = args.status === "done" && otherTasks.every((t) => t.status === "done");
+    const allDone = isNowDone && otherTasks.every((t) => t.status === "done");
 
     if (allDone && allTopicTasks.length > 0) {
       await ctx.db.patch(task.topicId, { status: "done" });
-    } else if (args.status !== "done") {
+    } else if (!isNowDone) {
       const topic = await ctx.db.get(task.topicId);
       if (topic && topic.status === "done") {
         await ctx.db.patch(task.topicId, { status: "in_progress" });
       }
     }
+
+    return true;
+  },
+});
+
+export const toggleTaskScheduled = mutation({
+  args: {
+    taskId: v.id("tasks"),
+    scheduledForToday: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthorized");
+    }
+
+    const task = await ctx.db.get(args.taskId);
+    if (!task || task.userId !== identity.subject) {
+      throw new Error("Task not found or unauthorized");
+    }
+
+    await ctx.db.patch(args.taskId, {
+      scheduledForToday: args.scheduledForToday,
+    });
 
     return true;
   },
@@ -130,7 +244,6 @@ export const deleteTask = mutation({
       throw new Error("Task not found or unauthorized");
     }
 
-    // Delete associated reviews if any
     const reviews = await ctx.db
       .query("reviews")
       .withIndex("by_task", (q) => q.eq("taskId", args.taskId))

@@ -14,7 +14,6 @@ export const getTopics = query({
       .order("desc")
       .collect();
 
-    // Compute task counts and progress for each topic
     const topicsWithStats = await Promise.all(
       topics.map(async (topic) => {
         const tasks = await ctx.db
@@ -65,6 +64,7 @@ export const createTopic = mutation({
         v.literal("done")
       )
     ),
+    tags: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -77,10 +77,81 @@ export const createTopic = mutation({
       name: args.name.trim(),
       description: args.description?.trim(),
       status: args.status ?? "not_started",
+      tags: args.tags ?? [],
+      resources: [],
       createdAt: Date.now(),
     });
 
     return topicId;
+  },
+});
+
+export const updateTopicNotes = mutation({
+  args: {
+    topicId: v.id("topics"),
+    notes: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthorized");
+    }
+
+    const topic = await ctx.db.get(args.topicId);
+    if (!topic || topic.userId !== identity.subject) {
+      throw new Error("Topic not found or unauthorized");
+    }
+
+    await ctx.db.patch(args.topicId, { notes: args.notes });
+    return true;
+  },
+});
+
+export const addTopicResource = mutation({
+  args: {
+    topicId: v.id("topics"),
+    title: v.string(),
+    url: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthorized");
+    }
+
+    const topic = await ctx.db.get(args.topicId);
+    if (!topic || topic.userId !== identity.subject) {
+      throw new Error("Topic not found or unauthorized");
+    }
+
+    const resources = topic.resources || [];
+    await ctx.db.patch(args.topicId, {
+      resources: [...resources, { title: args.title.trim(), url: args.url.trim() }],
+    });
+
+    return true;
+  },
+});
+
+export const deleteTopicResource = mutation({
+  args: {
+    topicId: v.id("topics"),
+    url: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthorized");
+    }
+
+    const topic = await ctx.db.get(args.topicId);
+    if (!topic || topic.userId !== identity.subject) {
+      throw new Error("Topic not found or unauthorized");
+    }
+
+    const resources = (topic.resources || []).filter((r) => r.url !== args.url);
+    await ctx.db.patch(args.topicId, { resources });
+    return true;
   },
 });
 
@@ -125,7 +196,6 @@ export const deleteTopic = mutation({
       throw new Error("Topic not found or unauthorized");
     }
 
-    // Delete associated tasks and any reviews
     const tasks = await ctx.db
       .query("tasks")
       .withIndex("by_topic", (q) => q.eq("topicId", args.topicId))
