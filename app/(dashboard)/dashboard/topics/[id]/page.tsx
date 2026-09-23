@@ -19,6 +19,8 @@ import {
   Search,
   Check,
   ChevronRight,
+  ChevronDown,
+  CornerDownRight,
   Sparkles,
   Zap,
   Clock,
@@ -50,6 +52,7 @@ export interface TaskItem {
   priority?: "low" | "medium" | "high";
   dueDate?: number;
   scheduledForToday?: boolean;
+  parentTaskId?: Id<"tasks">;
   createdAt: number;
   completedAt?: number;
 }
@@ -85,10 +88,49 @@ export default function TopicDetailPage({
   const toggleTaskScheduled = useMutation(api.tasks.toggleTaskScheduled);
   const deleteTask = useMutation(api.tasks.deleteTask);
   const deleteTopic = useMutation(api.topics.deleteTopic);
+  const createSubtask = useMutation(api.tasks.createSubtask);
 
   const [activeTab, setActiveTab] = useState<"tasks" | "notes">("tasks");
   const [taskFilter, setTaskFilter] = useState<"all" | "pending" | "done" | "high" | "deadlines">("all");
   const [taskSearch, setTaskSearch] = useState("");
+
+  // Subtasks State
+  const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set());
+  const [newSubtaskTitles, setNewSubtaskTitles] = useState<Record<string, string>>({});
+  const [isAddingSubtask, setIsAddingSubtask] = useState<Record<string, boolean>>({});
+
+  const toggleExpandTask = (taskId: string) => {
+    setExpandedTaskIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) {
+        next.delete(taskId);
+      } else {
+        next.add(taskId);
+      }
+      return next;
+    });
+  };
+
+  const handleAddSubtask = async (parentTaskId: Id<"tasks">) => {
+    const title = (newSubtaskTitles[parentTaskId] || "").trim();
+    if (!title) return;
+
+    try {
+      setIsAddingSubtask((prev) => ({ ...prev, [parentTaskId]: true }));
+      await createSubtask({
+        parentTaskId,
+        title,
+      });
+      setNewSubtaskTitles((prev) => ({ ...prev, [parentTaskId]: "" }));
+      setExpandedTaskIds((prev) => new Set(prev).add(parentTaskId));
+      toast.success("Subtask added!");
+    } catch (err) {
+      console.error("Failed to add subtask:", err);
+      toast.error("Failed to add subtask.");
+    } finally {
+      setIsAddingSubtask((prev) => ({ ...prev, [parentTaskId]: false }));
+    }
+  };
 
   // Milestone Creation Form State
   const [newTaskTitle, setNewTaskTitle] = useState("");
@@ -260,10 +302,28 @@ export default function TopicDetailPage({
     }
   };
 
-  // Filtered tasks calculation
+  // Group tasks into Main Tasks and Subtasks
+  const { mainTasks, subtasksByParent } = useMemo(() => {
+    if (!tasks) return { mainTasks: [], subtasksByParent: {} };
+
+    const subs: Record<string, TaskItem[]> = {};
+    const mains: TaskItem[] = [];
+
+    tasks.forEach((t) => {
+      if (t.parentTaskId) {
+        if (!subs[t.parentTaskId]) subs[t.parentTaskId] = [];
+        subs[t.parentTaskId].push(t);
+      } else {
+        mains.push(t);
+      }
+    });
+
+    return { mainTasks: mains, subtasksByParent: subs };
+  }, [tasks]);
+
+  // Filtered main tasks calculation
   const filteredTasks = useMemo(() => {
-    if (!tasks) return [];
-    return tasks.filter((task) => {
+    return mainTasks.filter((task) => {
       const matchesSearch = task.title.toLowerCase().includes(taskSearch.toLowerCase());
       if (!matchesSearch) return false;
 
@@ -273,7 +333,7 @@ export default function TopicDetailPage({
       if (taskFilter === "deadlines") return !!task.dueDate;
       return true;
     });
-  }, [tasks, taskFilter, taskSearch]);
+  }, [mainTasks, taskFilter, taskSearch]);
 
   if (topic === undefined || tasks === undefined) {
     return (
@@ -299,8 +359,8 @@ export default function TopicDetailPage({
     );
   }
 
-  const totalTasks = tasks.length;
-  const doneTasks = tasks.filter((t) => t.status === "done").length;
+  const totalTasks = mainTasks.length;
+  const doneTasks = mainTasks.filter((t) => t.status === "done").length;
   const pendingTasks = totalTasks - doneTasks;
   const progress = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
 
@@ -459,89 +519,92 @@ export default function TopicDetailPage({
       {/* Tab 1: Tasks & Milestones */}
       {activeTab === "tasks" && (
         <div className="space-y-5">
-          {/* Executive Milestone Creator with Deadline & Select2 */}
-          <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs space-y-4">
+          {/* Executive Unified Milestone Composer */}
+          <div className="rounded-2xl border border-border/80 bg-card p-4 sm:p-5 shadow-xs transition-all focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <Plus className="h-4 w-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-foreground">Add New Learning Milestone</h3>
-                  <p className="text-[11px] text-muted-foreground">Assign targets, priority levels, and track deadlines.</p>
+                  <h3 className="text-sm font-bold text-foreground">Add Learning Milestone</h3>
+                  <p className="text-[11px] text-muted-foreground">Break topic into actionable targets with deadlines & priorities.</p>
                 </div>
               </div>
             </div>
 
             <form onSubmit={handleAddTask} className="space-y-3 pt-1">
-              {/* Top Row: Milestone Title */}
+              {/* Milestone Title Input */}
               <div>
                 <Input
                   placeholder="What milestone, concept, or project do you want to accomplish?"
                   value={newTaskTitle}
                   onChange={(e) => setNewTaskTitle(e.target.value)}
                   disabled={isSubmitting}
-                  className="h-10 text-sm font-medium"
+                  className="h-10 text-sm font-medium border-border/80 bg-background focus-visible:ring-1 focus-visible:ring-primary"
                 />
               </div>
 
-              {/* Bottom Row: Flatpickr Deadline + Select2 Priority + Today Schedule Toggle + Submit Button */}
-              <div className="flex flex-wrap items-center gap-3">
-                {/* Flatpickr Target Deadline Picker */}
-                <div className="w-full sm:w-56">
-                  <FlatpickrDatePicker
-                    value={deadlineDate}
-                    onChange={(d) => setDeadlineDate(d)}
-                    placeholder="Target Deadline (Optional)"
-                    minDate="today"
-                  />
+              {/* Action & Metadata Toolbar */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 pt-2 border-t border-border/40">
+                {/* Meta Fields Group */}
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {/* Target Deadline Flatpickr */}
+                  <div className="w-full sm:w-48">
+                    <FlatpickrDatePicker
+                      value={deadlineDate}
+                      onChange={(d) => setDeadlineDate(d)}
+                      placeholder="Target Deadline"
+                      minDate="today"
+                    />
+                  </div>
+
+                  {/* Priority Selector */}
+                  <div className="w-full sm:w-40">
+                    <Select2Dropdown
+                      options={[
+                        {
+                          value: "high",
+                          label: "High Priority",
+                          icon: <div className="h-2 w-2 rounded-full bg-red-500" />,
+                        },
+                        {
+                          value: "medium",
+                          label: "Medium Priority",
+                          icon: <div className="h-2 w-2 rounded-full bg-amber-500" />,
+                        },
+                        {
+                          value: "low",
+                          label: "Low Priority",
+                          icon: <div className="h-2 w-2 rounded-full bg-blue-500" />,
+                        },
+                      ]}
+                      value={priority}
+                      onChange={(val) => setPriority(val as "low" | "medium" | "high")}
+                      isSearchable={false}
+                    />
+                  </div>
+
+                  {/* Schedule for Today Toggle Pill */}
+                  <button
+                    type="button"
+                    onClick={() => setScheduleToday(!scheduleToday)}
+                    className={`flex items-center gap-1.5 h-9 rounded-md border px-3 text-xs font-medium transition-all cursor-pointer ${
+                      scheduleToday
+                        ? "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold"
+                        : "border-input bg-background text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Star className={`h-3.5 w-3.5 ${scheduleToday ? "fill-amber-500 text-amber-500" : ""}`} />
+                    <span>{scheduleToday ? "Today's Queue" : "Add to Today"}</span>
+                  </button>
                 </div>
 
-                {/* Select2 Priority Picker */}
-                <div className="w-full sm:w-44">
-                  <Select2Dropdown
-                    options={[
-                      {
-                        value: "high",
-                        label: "High Priority",
-                        icon: <div className="h-2 w-2 rounded-full bg-red-500" />,
-                      },
-                      {
-                        value: "medium",
-                        label: "Medium Priority",
-                        icon: <div className="h-2 w-2 rounded-full bg-amber-500" />,
-                      },
-                      {
-                        value: "low",
-                        label: "Low Priority",
-                        icon: <div className="h-2 w-2 rounded-full bg-blue-500" />,
-                      },
-                    ]}
-                    value={priority}
-                    onChange={(val) => setPriority(val as "low" | "medium" | "high")}
-                    isSearchable={false}
-                  />
-                </div>
-
-                {/* Schedule for Today Toggle Pill */}
-                <button
-                  type="button"
-                  onClick={() => setScheduleToday(!scheduleToday)}
-                  className={`flex items-center gap-1.5 h-9 rounded-md border px-3 text-xs font-medium transition-all cursor-pointer ${
-                    scheduleToday
-                      ? "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold"
-                      : "border-input bg-background text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Star className={`h-3.5 w-3.5 ${scheduleToday ? "fill-amber-500" : ""}`} />
-                  <span>{scheduleToday ? "Focus Queue: Active" : "Add to Today's Plan"}</span>
-                </button>
-
-                {/* Add Milestone Button */}
+                {/* Submit Action */}
                 <Button
                   type="submit"
                   disabled={isSubmitting || !newTaskTitle.trim()}
-                  className="gap-1.5 h-9 px-4 font-semibold text-xs cursor-pointer ml-auto"
+                  className="gap-1.5 h-9 px-4.5 font-semibold text-xs rounded-lg shadow-xs cursor-pointer shrink-0 ml-auto sm:ml-0"
                 >
                   {isSubmitting ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -640,101 +703,246 @@ export default function TopicDetailPage({
                 </p>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 {filteredTasks.map((task) => {
                   const isDone = task.status === "done";
                   const isScheduled = !!task.scheduledForToday;
                   const deadlineInfo = getDeadlineInfo(task.dueDate, isDone);
+                  const isExpanded = expandedTaskIds.has(task._id);
+                  const subtasks = subtasksByParent[task._id] || [];
+                  const totalSubs = subtasks.length;
+                  const doneSubs = subtasks.filter((s) => s.status === "done").length;
+                  const subProgress = totalSubs === 0 ? 0 : Math.round((doneSubs / totalSubs) * 100);
 
                   return (
                     <div
                       key={task._id}
-                      className={`group flex items-center justify-between rounded-xl border p-4 transition-all ${
+                      className={`group flex flex-col rounded-2xl border transition-all ${
                         isDone
                           ? "border-border/50 bg-muted/20 text-muted-foreground"
                           : "border-border bg-card text-foreground hover:border-primary/50 shadow-2xs hover:shadow-xs"
                       }`}
                     >
-                      <div className="flex items-center gap-3.5 flex-1 min-w-0 pr-4">
-                        <Checkbox
-                          checked={isDone}
-                          onCheckedChange={() => handleToggleTask(task._id, task.status)}
-                          id={`task-${task._id}`}
-                          aria-label={`Mark task ${task.title} as ${isDone ? "incomplete" : "complete"}`}
-                          className="h-4.5 w-4.5 rounded-md"
-                        />
-                        <div className="flex flex-col min-w-0 flex-1">
-                          <label
-                            htmlFor={`task-${task._id}`}
-                            className={`text-sm cursor-pointer select-none truncate ${
-                              isDone ? "line-through text-muted-foreground" : "font-medium text-foreground"
+                      {/* Main Task Header Row */}
+                      <div className="flex items-center justify-between p-3.5 sm:p-4 gap-3">
+                        <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 pr-2">
+                          {/* Chevron Accordion Trigger */}
+                          <button
+                            type="button"
+                            onClick={() => toggleExpandTask(task._id)}
+                            className="text-muted-foreground hover:text-primary transition-colors p-1 rounded-md hover:bg-muted cursor-pointer shrink-0"
+                            title={isExpanded ? "Collapse subtasks" : "Expand subtasks"}
+                          >
+                            <ChevronRight
+                              className={`h-4 w-4 transition-transform duration-200 ${
+                                isExpanded ? "rotate-90 text-primary" : ""
+                              }`}
+                            />
+                          </button>
+
+                          {/* Checkbox */}
+                          <Checkbox
+                            checked={isDone}
+                            onCheckedChange={() => handleToggleTask(task._id, task.status)}
+                            id={`task-${task._id}`}
+                            aria-label={`Mark task ${task.title} as ${isDone ? "incomplete" : "complete"}`}
+                            className="h-4.5 w-4.5 rounded-md shrink-0"
+                          />
+
+                          {/* Title & Metadata */}
+                          <div className="flex flex-col min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <label
+                                htmlFor={`task-${task._id}`}
+                                className={`text-sm cursor-pointer select-none truncate ${
+                                  isDone ? "line-through text-muted-foreground" : "font-semibold text-foreground"
+                                }`}
+                              >
+                                {task.title}
+                              </label>
+
+                              {/* Subtasks Count Pill */}
+                              <button
+                                type="button"
+                                onClick={() => toggleExpandTask(task._id)}
+                                className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full transition-colors cursor-pointer ${
+                                  totalSubs > 0
+                                    ? "bg-primary/10 text-primary hover:bg-primary/20"
+                                    : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                }`}
+                              >
+                                <CornerDownRight className="h-3 w-3" />
+                                <span>{totalSubs > 0 ? `${doneSubs}/${totalSubs} sub-tasks` : "+ Add sub-tasks"}</span>
+                              </button>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                              {/* Deadline Badge */}
+                              {deadlineInfo && (
+                                <span
+                                  className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] ${deadlineInfo.className}`}
+                                >
+                                  {deadlineInfo.isOverdue ? (
+                                    <Clock className="h-3 w-3 text-red-500" />
+                                  ) : (
+                                    <CalendarDays className="h-3 w-3" />
+                                  )}
+                                  <span>{deadlineInfo.label}</span>
+                                </span>
+                              )}
+
+                              {/* Completed Timestamp */}
+                              {task.completedAt && isDone && (
+                                <span className="text-[10px] text-emerald-600 dark:text-emerald-400">
+                                  Completed {new Date(task.completedAt).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Right Actions */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          {task.priority && (
+                            <span
+                              className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                                task.priority === "high"
+                                  ? "bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20"
+                                  : task.priority === "medium"
+                                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                                  : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                              }`}
+                            >
+                              {task.priority}
+                            </span>
+                          )}
+
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleToggleScheduled(task)}
+                            title={isScheduled ? "Remove from Daily Planner" : "Add to Daily Planner"}
+                            className={`h-8 w-8 rounded-lg cursor-pointer ${
+                              isScheduled ? "text-amber-500 bg-amber-500/10" : "text-muted-foreground hover:text-foreground hover:bg-muted"
                             }`}
                           >
-                            {task.title}
-                          </label>
+                            <Star className={`h-4 w-4 ${isScheduled ? "fill-amber-500" : ""}`} />
+                          </Button>
 
-                          <div className="flex flex-wrap items-center gap-2 mt-1">
-                            {/* Deadline Badge */}
-                            {deadlineInfo && (
-                              <span
-                                className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] ${deadlineInfo.className}`}
-                              >
-                                {deadlineInfo.isOverdue ? (
-                                  <Clock className="h-3 w-3 text-red-500" />
-                                ) : (
-                                  <CalendarDays className="h-3 w-3" />
-                                )}
-                                <span>{deadlineInfo.label}</span>
-                              </span>
-                            )}
-
-                            {/* Completed Timestamp */}
-                            {task.completedAt && isDone && (
-                              <span className="text-[10px] text-emerald-600 dark:text-emerald-400">
-                                Completed {new Date(task.completedAt).toLocaleDateString()}
-                              </span>
-                            )}
-                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteTask(task._id)}
+                            className="h-8 w-8 rounded-lg text-muted-foreground opacity-70 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10 cursor-pointer"
+                            aria-label="Delete milestone"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        {task.priority && (
-                          <span
-                            className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
-                              task.priority === "high"
-                                ? "bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20"
-                                : task.priority === "medium"
-                                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
-                                : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
-                            }`}
-                          >
-                            {task.priority}
-                          </span>
-                        )}
+                      {/* Dropdown Sub-tasks Drawer */}
+                      {isExpanded && (
+                        <div className="border-t border-border/50 bg-muted/20 px-4 sm:px-6 py-3.5 space-y-3 animate-in fade-in duration-200">
+                          {totalSubs > 0 && (
+                            <div className="space-y-1.5 pb-1">
+                              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                                <span className="font-semibold text-foreground flex items-center gap-1.5">
+                                  <CornerDownRight className="h-3 w-3 text-primary" />
+                                  Sub-tasks Progress
+                                </span>
+                                <span className="font-bold text-foreground">
+                                  {doneSubs} of {totalSubs} completed ({subProgress}%)
+                                </span>
+                              </div>
+                              <Progress value={subProgress} className="h-1.5 rounded-full" />
+                            </div>
+                          )}
 
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleToggleScheduled(task)}
-                          title={isScheduled ? "Remove from Daily Planner" : "Add to Daily Planner"}
-                          className={`h-8 w-8 rounded-lg cursor-pointer ${
-                            isScheduled ? "text-amber-500 bg-amber-500/10" : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                          }`}
-                        >
-                          <Star className={`h-4 w-4 ${isScheduled ? "fill-amber-500" : ""}`} />
-                        </Button>
+                          {/* Subtasks items */}
+                          <div className="space-y-1.5 pl-2 border-l-2 border-primary/40">
+                            {subtasks.length === 0 ? (
+                              <p className="text-xs text-muted-foreground italic py-1">
+                                No sub-tasks yet. Add smaller breakdown steps below.
+                              </p>
+                            ) : (
+                              subtasks.map((sub) => {
+                                const isSubDone = sub.status === "done";
+                                return (
+                                  <div
+                                    key={sub._id}
+                                    className="group/sub flex items-center justify-between gap-2.5 rounded-lg border border-border/60 bg-card p-2.5 px-3 text-xs shadow-2xs hover:border-primary/40 transition-all"
+                                  >
+                                    <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                                      <Checkbox
+                                        checked={isSubDone}
+                                        onCheckedChange={() => handleToggleTask(sub._id, sub.status)}
+                                        id={`subtask-${sub._id}`}
+                                        className="h-3.5 w-3.5 rounded-sm"
+                                      />
+                                      <label
+                                        htmlFor={`subtask-${sub._id}`}
+                                        className={`select-none truncate cursor-pointer ${
+                                          isSubDone ? "line-through text-muted-foreground" : "font-medium text-foreground"
+                                        }`}
+                                      >
+                                        {sub.title}
+                                      </label>
+                                    </div>
 
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteTask(task._id)}
-                          className="h-8 w-8 rounded-lg text-muted-foreground opacity-70 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10 cursor-pointer"
-                          aria-label="Delete milestone"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteTask(sub._id)}
+                                      className="opacity-0 group-hover/sub:opacity-100 text-muted-foreground hover:text-destructive p-1 rounded transition-opacity cursor-pointer"
+                                      title="Delete subtask"
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </button>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+
+                          {/* Inline Add Subtask Input Form */}
+                          <div className="flex items-center gap-2 pt-1 pl-2">
+                            <input
+                              type="text"
+                              placeholder="Add a sub-task (e.g. Set up API routes) and press Enter..."
+                              value={newSubtaskTitles[task._id] || ""}
+                              onChange={(e) =>
+                                setNewSubtaskTitles((prev) => ({
+                                  ...prev,
+                                  [task._id]: e.target.value,
+                                }))
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  handleAddSubtask(task._id);
+                                }
+                              }}
+                              className="flex-1 h-8 rounded-lg border border-border bg-card px-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs"
+                            />
+                            <Button
+                              size="sm"
+                              onClick={() => handleAddSubtask(task._id)}
+                              disabled={
+                                isAddingSubtask[task._id] ||
+                                !(newSubtaskTitles[task._id] || "").trim()
+                              }
+                              className="h-8 px-3 text-xs font-semibold gap-1 rounded-lg cursor-pointer"
+                            >
+                              {isAddingSubtask[task._id] ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Plus className="h-3 w-3" />
+                              )}
+                              Add Sub-task
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

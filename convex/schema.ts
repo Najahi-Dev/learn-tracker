@@ -40,11 +40,13 @@ export default defineSchema({
     ),
     dueDate: v.optional(v.number()),
     scheduledForToday: v.optional(v.boolean()),
+    parentTaskId: v.optional(v.id("tasks")),
   })
     .index("by_topic", ["topicId"])
     .index("by_user", ["userId"])
     .index("by_user_status", ["userId", "status"])
-    .index("by_user_scheduled", ["userId", "scheduledForToday"]),
+    .index("by_user_scheduled", ["userId", "scheduledForToday"])
+    .index("by_parent", ["parentTaskId"]),
 
   reviews: defineTable({
     taskId: v.id("tasks"),

@@ -75,6 +75,7 @@ export const createTask = mutation({
     ),
     dueDate: v.optional(v.number()),
     scheduledForToday: v.optional(v.boolean()),
+    parentTaskId: v.optional(v.id("tasks")),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -98,6 +99,7 @@ export const createTask = mutation({
       priority: args.priority ?? "medium",
       dueDate: args.dueDate,
       scheduledForToday: args.scheduledForToday ?? false,
+      parentTaskId: args.parentTaskId,
       createdAt: now,
       completedAt: status === "done" ? now : undefined,
     });
@@ -107,6 +109,36 @@ export const createTask = mutation({
     }
 
     return taskId;
+  },
+});
+
+export const createSubtask = mutation({
+  args: {
+    parentTaskId: v.id("tasks"),
+    title: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthorized");
+    }
+
+    const parentTask = await ctx.db.get(args.parentTaskId);
+    if (!parentTask || parentTask.userId !== identity.subject) {
+      throw new Error("Parent task not found or unauthorized");
+    }
+
+    const now = Date.now();
+    const subtaskId = await ctx.db.insert("tasks", {
+      topicId: parentTask.topicId,
+      userId: identity.subject,
+      title: args.title.trim(),
+      status: "not_started",
+      parentTaskId: args.parentTaskId,
+      createdAt: now,
+    });
+
+    return subtaskId;
   },
 });
 
@@ -250,6 +282,15 @@ export const deleteTask = mutation({
       .collect();
     for (const review of reviews) {
       await ctx.db.delete(review._id);
+    }
+
+    // Also cascade delete child subtasks
+    const subtasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_parent", (q) => q.eq("parentTaskId", args.taskId))
+      .collect();
+    for (const sub of subtasks) {
+      await ctx.db.delete(sub._id);
     }
 
     await ctx.db.delete(args.taskId);
