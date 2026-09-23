@@ -25,7 +25,7 @@ export default function HomePage() {
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
               <BookOpen className="h-5 w-5" />
             </div>
-            <span className="text-lg font-bold tracking-tight">LearnTracker</span>
+            <span className="text-lg font-bold tracking-tight">MindForge</span>
           </div>
 
           <div className="flex items-center gap-3">
@@ -133,7 +133,7 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="border-t border-border/40 py-6 text-center text-xs text-muted-foreground">
-        <p>© {new Date().getFullYear()} LearnTracker. Built with Next.js, Convex & Clerk.</p>
+        <p>© {new Date().getFullYear()} MindForge. Built with Next.js, Convex & Clerk.</p>
       </footer>
     </div>
   );

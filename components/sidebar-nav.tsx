@@ -65,7 +65,7 @@ export function SidebarNav() {
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs">
             <BookOpen className="h-4 w-4" />
           </div>
-          <span className="text-sm">LearnTracker</span>
+          <span className="text-sm font-bold">MindForge</span>
         </Link>
 
         <div className="flex items-center gap-2">
@@ -109,8 +109,8 @@ export function SidebarNav() {
                 <BookOpen className="h-4 w-4" />
               </div>
               <div>
-                <span className="text-base font-bold leading-none block">LearnTracker</span>
-                <span className="text-[10px] font-medium text-muted-foreground">Mastery Workspace</span>
+                <span className="text-base font-bold leading-none block">MindForge</span>
+                <span className="text-[10px] font-medium text-muted-foreground">Study & Skill Tracker</span>
               </div>
             </Link>
 

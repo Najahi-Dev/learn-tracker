@@ -17,9 +17,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LearnTracker - Personal Learning & Mastery Tracker",
+  title: "MindForge - The Intelligent Study & Skill Tracker",
   description:
-    "Organize your learning topics, track tasks with spaced repetition, and master new skills effortlessly.",
+    "Organize your learning topics, track tasks with spaced repetition, and master new skills effortlessly with MindForge.",
 };
 
 export default function RootLayout({
