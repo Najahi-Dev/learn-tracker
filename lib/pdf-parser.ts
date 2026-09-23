@@ -265,10 +265,11 @@ export function analyzeDocumentToTasks(
 
 function cleanTitle(str: string): string {
   return str
+    .replace(/^\[[\s_xX]?\]\s*/, "")
     .replace(/^[\s•\-\*–—▪▫►➢0-9a-zA-Z\.\)\:\-]+/, (match) => {
-      // Keep module/chapter keywords clean if wanted, or strip numbers
       return match.trim() + " ";
     })
+    .replace(/^\[[\s_xX]?\]\s*/, "")
     .replace(/\s+/g, " ")
     .trim();
 }

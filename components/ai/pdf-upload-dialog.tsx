@@ -176,6 +176,47 @@ export function PdfUploadDialog({
     );
   };
 
+  const handleUpdateSubtask = (taskId: string, subtaskIndex: number, newTitle: string) => {
+    setParsedTasks((prev) =>
+      prev.map((t) => {
+        if (t.id === taskId) {
+          const updated = [...t.subtasks];
+          updated[subtaskIndex] = newTitle;
+          return { ...t, subtasks: updated };
+        }
+        return t;
+      })
+    );
+  };
+
+  const handleCyclePriority = (taskId: string) => {
+    setParsedTasks((prev) =>
+      prev.map((t) => {
+        if (t.id === taskId) {
+          const nextPriority: Record<"low" | "medium" | "high", "low" | "medium" | "high"> = {
+            low: "medium",
+            medium: "high",
+            high: "low",
+          };
+          return { ...t, priority: nextPriority[t.priority] };
+        }
+        return t;
+      })
+    );
+  };
+
+  const handleAddNewParentTask = () => {
+    const newTask: ParsedTaskItem = {
+      id: `task_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      title: "New Learning Milestone",
+      priority: "medium",
+      subtasks: ["Review core principles and practical examples"],
+      selected: true,
+    };
+    setParsedTasks((prev) => [...prev, newTask]);
+    setExpandedTaskIds((prev) => new Set(prev).add(newTask.id));
+  };
+
   const handleDeleteTask = (taskId: string) => {
     setParsedTasks((prev) => prev.filter((t) => t.id !== taskId));
   };
@@ -491,28 +532,32 @@ export function PdfUploadDialog({
                             <Input
                               value={task.title}
                               onChange={(e) => handleUpdateTaskTitle(task.id, e.target.value)}
-                              className="h-7 text-xs font-medium bg-transparent border-transparent hover:border-border focus:border-input focus:bg-background px-1.5"
+                              placeholder="Milestone title..."
+                              className="h-7 text-xs font-semibold bg-background/50 border-border/60 hover:border-primary/50 focus:border-primary focus:bg-background px-2"
                             />
                           </div>
 
-                          <Badge
-                            variant="outline"
-                            className={`text-[10px] capitalize shrink-0 ${
+                          {/* Interactive Priority Badge */}
+                          <button
+                            type="button"
+                            onClick={() => handleCyclePriority(task.id)}
+                            title="Click to toggle priority (High → Medium → Low)"
+                            className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-md border transition-all cursor-pointer shrink-0 hover:scale-105 active:scale-95 ${
                               task.priority === "high"
-                                ? "border-red-500/30 text-red-600 dark:text-red-400"
+                                ? "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20"
                                 : task.priority === "medium"
-                                ? "border-amber-500/30 text-amber-600 dark:text-amber-400"
-                                : "border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+                                ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20"
+                                : "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20"
                             }`}
                           >
                             {task.priority}
-                          </Badge>
+                          </button>
 
                           <button
                             type="button"
                             onClick={() => handleDeleteTask(task.id)}
                             className="text-muted-foreground hover:text-destructive p-1 rounded cursor-pointer"
-                            title="Remove task"
+                            title="Remove milestone"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -520,20 +565,25 @@ export function PdfUploadDialog({
 
                         {/* Nested Subtasks List */}
                         {isExpanded && (
-                          <div className="pl-9 pr-3 pb-2.5 pt-0.5 space-y-1.5 border-t border-border/30 bg-muted/10">
+                          <div className="pl-8 pr-3 pb-2.5 pt-1 space-y-1.5 border-t border-border/30 bg-muted/10">
                             {task.subtasks.map((sub, sIdx) => (
                               <div
                                 key={sIdx}
-                                className="flex items-center justify-between gap-2 group text-xs text-muted-foreground hover:text-foreground"
+                                className="flex items-center justify-between gap-1.5 group text-xs text-muted-foreground hover:text-foreground bg-background/50 hover:bg-background border border-border/40 hover:border-indigo-500/40 rounded-md p-0.5 pr-1.5 transition-all shadow-2xs"
                               >
                                 <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                                  <span className="text-[10px] text-muted-foreground/60">•</span>
-                                  <span className="truncate">{sub}</span>
+                                  <span className="text-[10px] text-muted-foreground/50 pl-1.5 font-bold">•</span>
+                                  <Input
+                                    value={sub}
+                                    onChange={(e) => handleUpdateSubtask(task.id, sIdx, e.target.value)}
+                                    placeholder="Subtask description..."
+                                    className="h-6 text-xs bg-transparent border-transparent hover:border-border/60 focus:border-indigo-500 focus:bg-background px-1.5 py-0 shadow-none font-normal"
+                                  />
                                 </div>
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteSubtask(task.id, sIdx)}
-                                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive p-0.5 rounded cursor-pointer transition-opacity"
+                                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive p-1 rounded cursor-pointer transition-opacity shrink-0"
                                   title="Remove subtask"
                                 >
                                   <Trash2 className="h-3 w-3" />
@@ -544,7 +594,7 @@ export function PdfUploadDialog({
                             <button
                               type="button"
                               onClick={() => handleAddSubtask(task.id)}
-                              className="flex items-center gap-1 text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline pt-1 cursor-pointer font-medium"
+                              className="flex items-center gap-1 text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline pt-1 cursor-pointer font-medium pl-1"
                             >
                               <Plus className="h-3 w-3" />
                               Add subtask
@@ -555,6 +605,18 @@ export function PdfUploadDialog({
                     );
                   })
                 )}
+
+                {/* Add Parent Milestone Button */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddNewParentTask}
+                  className="w-full text-xs border-dashed border-border/80 hover:border-indigo-500 hover:bg-indigo-500/5 text-muted-foreground hover:text-indigo-600 dark:hover:text-indigo-400 gap-1.5 h-8.5 mt-2"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Add Another Milestone / Chapter</span>
+                </Button>
               </div>
             </div>
           )}

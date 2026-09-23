@@ -939,13 +939,14 @@ export default function TopicDetailPage({
                     >
                       {/* Main Task Header Row */}
                       {editingTaskId === task._id ? (
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-3.5 sm:p-4 gap-3 bg-primary/5 rounded-2xl border-2 border-primary/50">
-                          <div className="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                        <div className="flex flex-col gap-3 p-3.5 sm:p-4 bg-primary/5 rounded-2xl border-2 border-primary/50 shadow-xs">
+                          {/* Row 1: Milestone Title Input */}
+                          <div className="w-full">
                             <Input
                               value={editingTaskTitle}
                               onChange={(e) => setEditingTaskTitle(e.target.value)}
                               placeholder="Milestone title..."
-                              className="h-8 text-xs font-semibold bg-background flex-1"
+                              className="h-9 text-xs sm:text-sm font-semibold bg-background w-full border-border/80 focus-visible:ring-primary"
                               autoFocus
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") {
@@ -956,64 +957,78 @@ export default function TopicDetailPage({
                                 }
                               }}
                             />
-                            <div className="w-full sm:w-36">
-                              <Select2Dropdown
-                                options={[
-                                  {
-                                    value: "high",
-                                    label: "High Priority",
-                                    icon: <div className="h-2 w-2 rounded-full bg-red-500" />,
-                                  },
-                                  {
-                                    value: "medium",
-                                    label: "Medium Priority",
-                                    icon: <div className="h-2 w-2 rounded-full bg-amber-500" />,
-                                  },
-                                  {
-                                    value: "low",
-                                    label: "Low Priority",
-                                    icon: <div className="h-2 w-2 rounded-full bg-blue-500" />,
-                                  },
-                                ]}
-                                value={editingTaskPriority}
-                                onChange={(val) =>
-                                  setEditingTaskPriority(val as "low" | "medium" | "high")
-                                }
-                                isSearchable={false}
-                              />
-                            </div>
-                            <div className="w-full sm:w-36">
-                              <FlatpickrDatePicker
-                                value={editingTaskDueDate}
-                                onChange={(d) => setEditingTaskDueDate(d)}
-                                placeholder="Deadline"
-                                minDate="today"
-                              />
-                            </div>
                           </div>
-                          <div className="flex items-center gap-1.5 ml-auto sm:ml-0 shrink-0">
-                            <Button
-                              size="sm"
-                              onClick={() => handleSaveEditTask(task._id)}
-                              disabled={isSavingTaskEdit || !editingTaskTitle.trim()}
-                              className="h-8 px-3 text-xs gap-1 bg-primary text-primary-foreground font-semibold cursor-pointer"
-                            >
-                              {isSavingTaskEdit ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                <Check className="h-3.5 w-3.5" />
-                              )}
-                              <span>Save</span>
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={handleCancelEditTask}
-                              disabled={isSavingTaskEdit}
-                              className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </Button>
+
+                          {/* Row 2: Metadata Controls & Action Buttons */}
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 pt-2 border-t border-primary/20">
+                            <div className="flex flex-wrap items-center gap-2.5">
+                              {/* Priority Dropdown */}
+                              <div className="w-full sm:w-40">
+                                <Select2Dropdown
+                                  options={[
+                                    {
+                                      value: "high",
+                                      label: "High Priority",
+                                      icon: <div className="h-2 w-2 rounded-full bg-red-500" />,
+                                    },
+                                    {
+                                      value: "medium",
+                                      label: "Medium Priority",
+                                      icon: <div className="h-2 w-2 rounded-full bg-amber-500" />,
+                                    },
+                                    {
+                                      value: "low",
+                                      label: "Low Priority",
+                                      icon: <div className="h-2 w-2 rounded-full bg-blue-500" />,
+                                    },
+                                  ]}
+                                  value={editingTaskPriority}
+                                  onChange={(val) =>
+                                    setEditingTaskPriority(val as "low" | "medium" | "high")
+                                  }
+                                  isSearchable={false}
+                                />
+                              </div>
+
+                              {/* Target Deadline Picker */}
+                              <div className="w-full sm:w-44">
+                                <FlatpickrDatePicker
+                                  value={editingTaskDueDate}
+                                  onChange={(d) => setEditingTaskDueDate(d)}
+                                  placeholder="Target Deadline"
+                                  minDate="today"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-2 ml-auto shrink-0 pt-1 sm:pt-0">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={handleCancelEditTask}
+                                disabled={isSavingTaskEdit}
+                                className="h-8.5 px-3 text-xs gap-1.5 cursor-pointer text-muted-foreground hover:text-foreground"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                                <span>Cancel</span>
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => handleSaveEditTask(task._id)}
+                                disabled={isSavingTaskEdit || !editingTaskTitle.trim()}
+                                className="h-8.5 px-3.5 text-xs gap-1.5 bg-primary text-primary-foreground font-semibold cursor-pointer shadow-xs"
+                              >
+                                {isSavingTaskEdit ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <Check className="h-3.5 w-3.5" />
+                                )}
+                                <span>Save Changes</span>
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       ) : (
