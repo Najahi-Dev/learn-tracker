@@ -35,6 +35,8 @@ export interface TopicItem {
   description?: string;
   status: TopicStatus;
   createdAt: number;
+  tags?: string[];
+  resources?: Array<{ title: string; url: string }>;
   totalTasks?: number;
   doneTasks?: number;
   progress?: number;

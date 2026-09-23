@@ -72,23 +72,18 @@ export function MarkdownNotes({
         topicId,
         title: "Study Notes & Summary",
         content: initialNotes,
-      }).then((newId) => {
-        setActiveNoteId(newId);
       });
     }
   }, [notes, initialNotes, topicId, createNote]);
 
-  // Set default active note if none selected
+  // Only clear active note if the currently selected note was deleted
   React.useEffect(() => {
-    if (notes && notes.length > 0) {
+    if (activeNoteId && notes) {
       const exists = notes.some((n) => n._id === activeNoteId);
-      if (!activeNoteId || !exists) {
-        setActiveNoteId(notes[0]._id);
-        setActiveTitle(notes[0].title);
+      if (!exists) {
+        setActiveNoteId(null);
+        setActiveTitle("");
       }
-    } else {
-      setActiveNoteId(null);
-      setActiveTitle("");
     }
   }, [notes, activeNoteId]);
 
@@ -376,12 +371,23 @@ export function MarkdownNotes({
                     className="text-lg font-bold text-foreground bg-transparent border-none outline-none focus:ring-0 placeholder:text-muted-foreground flex-1"
                   />
 
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
-                    <Calendar className="h-3.5 w-3.5" />
-                    <span>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
+                    <span className="flex items-center gap-1.5">
+                      <Calendar className="h-3.5 w-3.5" />
                       Updated{" "}
                       {new Date(activeNote.updatedAt || activeNote.createdAt).toLocaleDateString()}
                     </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setActiveNoteId(null);
+                        setActiveTitle("");
+                      }}
+                      className="h-7 text-xs px-2 text-muted-foreground hover:text-foreground cursor-pointer"
+                    >
+                      Close Editor
+                    </Button>
                   </div>
                 </div>
               </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import React from "react";
 import {
   Dialog,
   DialogContent,
@@ -17,128 +17,49 @@ import {
   Maximize2,
   CloudRain,
   Waves,
+  Flame,
+  Coffee,
+  Timer as TimerIcon,
+  Volume2,
+  Bell,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useFocus, FocusMode, AmbientSound } from "@/components/providers/focus-provider";
 
 export function ZenFocusModal() {
-  const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<"pomodoro" | "break" | "stopwatch">("pomodoro");
-  const [timeLeft, setTimeLeft] = useState(25 * 60);
-  const [isRunning, setIsRunning] = useState(false);
-  const [ambientSound, setAmbientSound] = useState<"none" | "rain" | "waves">("none");
-  const [scratchpad, setScratchpad] = useState("");
-
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const noiseNodeRef = useRef<AudioNode | null>(null);
-
-  // Timer Tick
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (isRunning) {
-      timer = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (mode === "stopwatch") {
-            return prev + 1;
-          }
-          if (prev <= 1) {
-            setIsRunning(false);
-            toast.success(
-              mode === "pomodoro"
-                ? "Pomodoro Focus session complete! Time for a short break."
-                : "Break time over! Ready for the next deep focus block?"
-            );
-            return mode === "pomodoro" ? 5 * 60 : 25 * 60;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => clearInterval(timer);
-  }, [isRunning, mode]);
-
-  // Ambient Sound Synth via Web Audio API (Rain / Waves)
-  useEffect(() => {
-    if (ambientSound === "none") {
-      if (audioCtxRef.current) {
-        audioCtxRef.current.close().catch(() => {});
-        audioCtxRef.current = null;
-      }
-      return;
-    }
-
-    try {
-      const AudioContextClass =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      const ctx = new AudioContextClass();
-      audioCtxRef.current = ctx;
-
-      const bufferSize = ctx.sampleRate * 2;
-      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-      const data = buffer.getChannelData(0);
-
-      // Generate Pink/Brown Noise for rain and wave sensations
-      let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
-      for (let i = 0; i < bufferSize; i++) {
-        const white = Math.random() * 2 - 1;
-        b0 = 0.99886 * b0 + white * 0.0555179;
-        b1 = 0.99332 * b1 + white * 0.0750759;
-        b2 = 0.96900 * b2 + white * 0.1538520;
-        b3 = 0.86650 * b3 + white * 0.3104856;
-        b4 = 0.55000 * b4 + white * 0.5329522;
-        b5 = -0.7616 * b5 - white * 0.0168980;
-        data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.04;
-        b6 = white * 0.115926;
-      }
-
-      const noise = ctx.createBufferSource();
-      noise.buffer = buffer;
-      noise.loop = true;
-
-      const gain = ctx.createGain();
-      gain.gain.value = ambientSound === "rain" ? 0.2 : 0.3;
-
-      const filter = ctx.createBiquadFilter();
-      filter.type = "lowpass";
-      filter.frequency.value = ambientSound === "rain" ? 1000 : 400;
-
-      noise.connect(filter);
-      filter.connect(gain);
-      gain.connect(ctx.destination);
-      noise.start(0);
-      noiseNodeRef.current = noise;
-    } catch {
-      // Audio context may be restricted before user gesture
-    }
-
-    return () => {
-      if (audioCtxRef.current) {
-        audioCtxRef.current.close().catch(() => {});
-        audioCtxRef.current = null;
-      }
-    };
-  }, [ambientSound]);
-
-  const handleModeChange = (newMode: "pomodoro" | "break" | "stopwatch") => {
-    setMode(newMode);
-    setIsRunning(false);
-    if (newMode === "pomodoro") setTimeLeft(25 * 60);
-    else if (newMode === "break") setTimeLeft(5 * 60);
-    else setTimeLeft(0);
-  };
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-  };
+  const {
+    mode,
+    timeLeft,
+    isRunning,
+    ambientSound,
+    scratchpad,
+    isModalOpen,
+    setIsModalOpen,
+    setMode,
+    toggleTimer,
+    resetTimer,
+    setAmbientSound,
+    setScratchpad,
+    formatTime,
+    playChime,
+  } = useFocus();
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-1.5 border-primary/40 hover:bg-primary/10">
-          <Maximize2 className="h-3.5 w-3.5 text-primary" />
-          <span className="hidden sm:inline">Zen Focus Studio</span>
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full justify-start gap-2 border-primary/40 bg-card hover:bg-primary/10 transition-colors shadow-xs"
+        >
+          <Sparkles className="h-3.5 w-3.5 text-primary" />
+          <span className="text-xs font-semibold">Zen Focus Studio</span>
+          {isRunning && (
+            <span className="ml-auto flex items-center gap-1.5 text-[10px] font-mono font-bold text-primary">
+              <span className="h-2 w-2 rounded-full bg-primary animate-ping" />
+              {formatTime(timeLeft)}
+            </span>
+          )}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[700px] border-border/80 bg-background/95 backdrop-blur-md p-6 shadow-2xl">
@@ -157,8 +78,8 @@ export function ZenFocusModal() {
             {/* Mode Pills */}
             <div className="flex rounded-lg border border-border bg-muted/40 p-1">
               <button
-                onClick={() => handleModeChange("pomodoro")}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                onClick={() => resetTimer("pomodoro")}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all cursor-pointer ${
                   mode === "pomodoro"
                     ? "bg-background text-foreground shadow-xs font-semibold"
                     : "text-muted-foreground hover:text-foreground"
@@ -167,8 +88,8 @@ export function ZenFocusModal() {
                 25m Focus
               </button>
               <button
-                onClick={() => handleModeChange("break")}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                onClick={() => resetTimer("break")}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all cursor-pointer ${
                   mode === "break"
                     ? "bg-background text-foreground shadow-xs font-semibold"
                     : "text-muted-foreground hover:text-foreground"
@@ -177,8 +98,8 @@ export function ZenFocusModal() {
                 5m Break
               </button>
               <button
-                onClick={() => handleModeChange("stopwatch")}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                onClick={() => resetTimer("stopwatch")}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all cursor-pointer ${
                   mode === "stopwatch"
                     ? "bg-background text-foreground shadow-xs font-semibold"
                     : "text-muted-foreground hover:text-foreground"
@@ -197,8 +118,8 @@ export function ZenFocusModal() {
             <div className="flex items-center gap-2">
               <Button
                 size="lg"
-                onClick={() => setIsRunning(!isRunning)}
-                className="gap-2 px-6 h-10 shadow-sm"
+                onClick={toggleTimer}
+                className="gap-2 px-6 h-10 shadow-sm cursor-pointer"
               >
                 {isRunning ? (
                   <>
@@ -213,8 +134,9 @@ export function ZenFocusModal() {
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => handleModeChange(mode)}
-                className="h-10 w-10"
+                onClick={() => resetTimer(mode)}
+                className="h-10 w-10 cursor-pointer"
+                title="Reset timer"
               >
                 <RotateCcw className="h-4 w-4" />
               </Button>
@@ -245,6 +167,18 @@ export function ZenFocusModal() {
                 <Waves className="h-3.5 w-3.5" />
                 <span>Waves</span>
               </button>
+
+              <button
+                onClick={() => {
+                  playChime("focus");
+                  toast.success("Playing completion chime preview!");
+                }}
+                className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors cursor-pointer px-2 py-1 rounded-md hover:bg-muted/50 ml-1"
+                title="Preview completion bell"
+              >
+                <Bell className="h-3 w-3" />
+                <span>Test Bell</span>
+              </button>
             </div>
           </div>
 
@@ -273,7 +207,7 @@ export function ZenFocusModal() {
                 navigator.clipboard.writeText(scratchpad);
                 toast.success("Scratchpad copied to clipboard!");
               }}
-              className="text-xs h-8 w-full"
+              className="text-xs h-8 w-full cursor-pointer"
             >
               Copy Notes
             </Button>

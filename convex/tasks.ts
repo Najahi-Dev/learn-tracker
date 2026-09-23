@@ -256,3 +256,32 @@ export const deleteTask = mutation({
     return true;
   },
 });
+
+export const getAllTasks = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return [];
+    }
+
+    const tasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
+      .order("desc")
+      .collect();
+
+    const tasksWithTopic = await Promise.all(
+      tasks.map(async (task) => {
+        const topic = await ctx.db.get(task.topicId);
+        return {
+          ...task,
+          topicName: topic?.name || "Topic",
+        };
+      })
+    );
+
+    return tasksWithTopic;
+  },
+});
+
