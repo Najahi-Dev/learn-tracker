@@ -22,8 +22,14 @@ export const getTasksByTopic = query({
     const tasks = await ctx.db
       .query("tasks")
       .withIndex("by_topic", (q) => q.eq("topicId", args.topicId))
-      .order("desc")
       .collect();
+
+    // Sort ascending by order (if set), falling back to createdAt
+    tasks.sort((a, b) => {
+      const orderA = a.order !== undefined ? a.order : a.createdAt;
+      const orderB = b.order !== undefined ? b.order : b.createdAt;
+      return orderA - orderB;
+    });
 
     return tasks;
   },
@@ -88,6 +94,11 @@ export const createTask = mutation({
       throw new Error("Topic not found or unauthorized");
     }
 
+    const existingTasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_topic", (q) => q.eq("topicId", args.topicId))
+      .collect();
+
     const status = args.status ?? "not_started";
     const now = Date.now();
 
@@ -100,6 +111,7 @@ export const createTask = mutation({
       dueDate: args.dueDate,
       scheduledForToday: args.scheduledForToday ?? false,
       parentTaskId: args.parentTaskId,
+      order: existingTasks.length,
       createdAt: now,
       completedAt: status === "done" ? now : undefined,
     });
@@ -139,6 +151,36 @@ export const createSubtask = mutation({
     });
 
     return subtaskId;
+  },
+});
+
+export const updateTask = mutation({
+  args: {
+    taskId: v.id("tasks"),
+    title: v.string(),
+    priority: v.optional(
+      v.union(v.literal("low"), v.literal("medium"), v.literal("high"))
+    ),
+    dueDate: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthorized");
+    }
+
+    const task = await ctx.db.get(args.taskId);
+    if (!task || task.userId !== identity.subject) {
+      throw new Error("Task not found or unauthorized");
+    }
+
+    await ctx.db.patch(args.taskId, {
+      title: args.title.trim(),
+      priority: args.priority !== undefined ? args.priority : task.priority,
+      dueDate: args.dueDate !== undefined ? args.dueDate : task.dueDate,
+    });
+
+    return true;
   },
 });
 
@@ -323,6 +365,208 @@ export const getAllTasks = query({
     );
 
     return tasksWithTopic;
+  },
+});
+
+export const importTasksAndSubtasks = mutation({
+  args: {
+    topicId: v.id("topics"),
+    tasks: v.array(
+      v.object({
+        title: v.string(),
+        priority: v.optional(
+          v.union(v.literal("low"), v.literal("medium"), v.literal("high"))
+        ),
+        subtasks: v.optional(v.array(v.string())),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthorized");
+    }
+
+    const topic = await ctx.db.get(args.topicId);
+    if (!topic || topic.userId !== identity.subject) {
+      throw new Error("Topic not found or unauthorized");
+    }
+
+    const existingTasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_topic", (q) => q.eq("topicId", args.topicId))
+      .collect();
+
+    const startOrder = existingTasks.length;
+    const now = Date.now();
+    let createdTasksCount = 0;
+    let createdSubtasksCount = 0;
+
+    for (let i = 0; i < args.tasks.length; i++) {
+      const item = args.tasks[i];
+      if (!item.title.trim()) continue;
+      const parentTaskId = await ctx.db.insert("tasks", {
+        topicId: args.topicId,
+        userId: identity.subject,
+        title: item.title.trim(),
+        status: "not_started",
+        priority: item.priority ?? "medium",
+        order: startOrder + i,
+        createdAt: now,
+      });
+      createdTasksCount++;
+
+      if (item.subtasks && item.subtasks.length > 0) {
+        for (let j = 0; j < item.subtasks.length; j++) {
+          const subTitle = item.subtasks[j];
+          if (!subTitle.trim()) continue;
+          await ctx.db.insert("tasks", {
+            topicId: args.topicId,
+            userId: identity.subject,
+            title: subTitle.trim(),
+            status: "not_started",
+            parentTaskId,
+            order: j,
+            createdAt: now,
+          });
+          createdSubtasksCount++;
+        }
+      }
+    }
+
+    if (topic.status === "not_started" && createdTasksCount > 0) {
+      await ctx.db.patch(args.topicId, { status: "in_progress" });
+    }
+
+    return {
+      success: true,
+      tasksCreated: createdTasksCount,
+      subtasksCreated: createdSubtasksCount,
+    };
+  },
+});
+
+export const importTopicWithTasksFromPdf = mutation({
+  args: {
+    topicName: v.string(),
+    description: v.optional(v.string()),
+    tasks: v.array(
+      v.object({
+        title: v.string(),
+        priority: v.optional(
+          v.union(v.literal("low"), v.literal("medium"), v.literal("high"))
+        ),
+        subtasks: v.optional(v.array(v.string())),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthorized");
+    }
+
+    const now = Date.now();
+    const topicId = await ctx.db.insert("topics", {
+      userId: identity.subject,
+      name: args.topicName.trim() || "Imported Study Plan",
+      description: args.description?.trim() || "Curriculum imported from PDF",
+      status: "in_progress",
+      createdAt: now,
+      tags: ["pdf-imported"],
+      resources: [],
+    });
+
+    let createdTasksCount = 0;
+    let createdSubtasksCount = 0;
+
+    for (let i = 0; i < args.tasks.length; i++) {
+      const item = args.tasks[i];
+      if (!item.title.trim()) continue;
+      const parentTaskId = await ctx.db.insert("tasks", {
+        topicId,
+        userId: identity.subject,
+        title: item.title.trim(),
+        status: "not_started",
+        priority: item.priority ?? "medium",
+        order: i,
+        createdAt: now,
+      });
+      createdTasksCount++;
+
+      if (item.subtasks && item.subtasks.length > 0) {
+        for (let j = 0; j < item.subtasks.length; j++) {
+          const subTitle = item.subtasks[j];
+          if (!subTitle.trim()) continue;
+          await ctx.db.insert("tasks", {
+            topicId,
+            userId: identity.subject,
+            title: subTitle.trim(),
+            status: "not_started",
+            parentTaskId,
+            order: j,
+            createdAt: now,
+          });
+          createdSubtasksCount++;
+        }
+      }
+    }
+
+    return {
+      topicId,
+      tasksCreated: createdTasksCount,
+      subtasksCreated: createdSubtasksCount,
+    };
+  },
+});
+
+export const reorderTasks = mutation({
+  args: {
+    topicId: v.id("topics"),
+    orderedTaskIds: v.array(v.id("tasks")),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthorized");
+    }
+
+    const topic = await ctx.db.get(args.topicId);
+    if (!topic || topic.userId !== identity.subject) {
+      throw new Error("Topic not found or unauthorized");
+    }
+
+    for (let i = 0; i < args.orderedTaskIds.length; i++) {
+      const taskId = args.orderedTaskIds[i];
+      const task = await ctx.db.get(taskId);
+      if (task && task.userId === identity.subject) {
+        await ctx.db.patch(taskId, { order: i });
+      }
+    }
+
+    return true;
+  },
+});
+
+export const reorderSubtasks = mutation({
+  args: {
+    orderedSubtaskIds: v.array(v.id("tasks")),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthorized");
+    }
+
+    for (let i = 0; i < args.orderedSubtaskIds.length; i++) {
+      const subtaskId = args.orderedSubtaskIds[i];
+      const subtask = await ctx.db.get(subtaskId);
+      if (subtask && subtask.userId === identity.subject) {
+        await ctx.db.patch(subtaskId, { order: i });
+      }
+    }
+
+    return true;
   },
 });
 

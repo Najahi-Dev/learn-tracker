@@ -26,6 +26,9 @@ import {
   Clock,
   CalendarDays,
   Flame,
+  GripVertical,
+  Pencil,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +37,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { MarkdownNotes } from "@/components/notes/markdown-notes";
 import { FeynmanEvaluatorDialog } from "@/components/ai/feynman-evaluator-dialog";
+import { PdfUploadDialog } from "@/components/ai/pdf-upload-dialog";
 import { ZenFocusModal } from "@/components/focus/zen-focus-modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Select2Dropdown, type Select2Option } from "@/components/ui/select2-dropdown";
@@ -89,10 +93,31 @@ export default function TopicDetailPage({
   const deleteTask = useMutation(api.tasks.deleteTask);
   const deleteTopic = useMutation(api.topics.deleteTopic);
   const createSubtask = useMutation(api.tasks.createSubtask);
+  const updateTask = useMutation(api.tasks.updateTask);
+  const reorderTasks = useMutation(api.tasks.reorderTasks);
+  const reorderSubtasks = useMutation(api.tasks.reorderSubtasks);
 
   const [activeTab, setActiveTab] = useState<"tasks" | "notes">("tasks");
   const [taskFilter, setTaskFilter] = useState<"all" | "pending" | "done" | "high" | "deadlines">("all");
   const [taskSearch, setTaskSearch] = useState("");
+
+  // Drag & Drop State
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
+  const [draggedSubtaskId, setDraggedSubtaskId] = useState<string | null>(null);
+  const [dragOverSubtaskId, setDragOverSubtaskId] = useState<string | null>(null);
+
+  // Edit Task State
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editingTaskTitle, setEditingTaskTitle] = useState("");
+  const [editingTaskPriority, setEditingTaskPriority] = useState<"low" | "medium" | "high">("medium");
+  const [editingTaskDueDate, setEditingTaskDueDate] = useState<Date | null>(null);
+  const [isSavingTaskEdit, setIsSavingTaskEdit] = useState(false);
+
+  // Edit Subtask State
+  const [editingSubtaskId, setEditingSubtaskId] = useState<string | null>(null);
+  const [editingSubtaskTitle, setEditingSubtaskTitle] = useState("");
+  const [isSavingSubtaskEdit, setIsSavingSubtaskEdit] = useState(false);
 
   // Subtasks State
   const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set());
@@ -130,6 +155,146 @@ export default function TopicDetailPage({
     } finally {
       setIsAddingSubtask((prev) => ({ ...prev, [parentTaskId]: false }));
     }
+  };
+
+  const handleDropTask = async (targetTaskId: Id<"tasks">) => {
+    if (!draggedTaskId || draggedTaskId === targetTaskId) {
+      setDraggedTaskId(null);
+      setDragOverTaskId(null);
+      return;
+    }
+
+    const currentTaskIds = mainTasks.map((t) => t._id);
+    const fromIndex = currentTaskIds.indexOf(draggedTaskId as Id<"tasks">);
+    const toIndex = currentTaskIds.indexOf(targetTaskId);
+
+    if (fromIndex === -1 || toIndex === -1) {
+      setDraggedTaskId(null);
+      setDragOverTaskId(null);
+      return;
+    }
+
+    const reordered = [...currentTaskIds];
+    const [removed] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, removed);
+
+    setDraggedTaskId(null);
+    setDragOverTaskId(null);
+
+    try {
+      await reorderTasks({
+        topicId,
+        orderedTaskIds: reordered,
+      });
+      toast.success("Task position updated!");
+    } catch (err) {
+      console.error("Failed to reorder tasks:", err);
+      toast.error("Failed to update task order.");
+    }
+  };
+
+  const handleDropSubtask = async (parentTaskId: Id<"tasks">, targetSubtaskId: Id<"tasks">) => {
+    if (!draggedSubtaskId || draggedSubtaskId === targetSubtaskId) {
+      setDraggedSubtaskId(null);
+      setDragOverSubtaskId(null);
+      return;
+    }
+
+    const currentSubtasks = subtasksByParent[parentTaskId] || [];
+    const currentSubtaskIds = currentSubtasks.map((s) => s._id);
+    const fromIndex = currentSubtaskIds.indexOf(draggedSubtaskId as Id<"tasks">);
+    const toIndex = currentSubtaskIds.indexOf(targetSubtaskId);
+
+    if (fromIndex === -1 || toIndex === -1) {
+      setDraggedSubtaskId(null);
+      setDragOverSubtaskId(null);
+      return;
+    }
+
+    const reordered = [...currentSubtaskIds];
+    const [removed] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, removed);
+
+    setDraggedSubtaskId(null);
+    setDragOverSubtaskId(null);
+
+    try {
+      await reorderSubtasks({
+        orderedSubtaskIds: reordered,
+      });
+      toast.success("Subtask position updated!");
+    } catch (err) {
+      console.error("Failed to reorder subtasks:", err);
+    }
+  };
+
+  const handleStartEditTask = (task: TaskItem) => {
+    setEditingTaskId(task._id);
+    setEditingTaskTitle(task.title);
+    setEditingTaskPriority(task.priority || "medium");
+    setEditingTaskDueDate(task.dueDate ? new Date(task.dueDate) : null);
+  };
+
+  const handleSaveEditTask = async (taskId: Id<"tasks">) => {
+    if (!editingTaskTitle.trim()) {
+      toast.error("Task title cannot be empty.");
+      return;
+    }
+
+    try {
+      setIsSavingTaskEdit(true);
+      await updateTask({
+        taskId,
+        title: editingTaskTitle.trim(),
+        priority: editingTaskPriority,
+        dueDate: editingTaskDueDate ? editingTaskDueDate.getTime() : undefined,
+      });
+      setEditingTaskId(null);
+      toast.success("Task updated successfully!");
+    } catch (err) {
+      console.error("Failed to update task:", err);
+      toast.error("Failed to update task.");
+    } finally {
+      setIsSavingTaskEdit(false);
+    }
+  };
+
+  const handleCancelEditTask = () => {
+    setEditingTaskId(null);
+    setEditingTaskTitle("");
+    setEditingTaskDueDate(null);
+  };
+
+  const handleStartEditSubtask = (sub: TaskItem) => {
+    setEditingSubtaskId(sub._id);
+    setEditingSubtaskTitle(sub.title);
+  };
+
+  const handleSaveEditSubtask = async (subId: Id<"tasks">) => {
+    if (!editingSubtaskTitle.trim()) {
+      toast.error("Subtask title cannot be empty.");
+      return;
+    }
+
+    try {
+      setIsSavingSubtaskEdit(true);
+      await updateTask({
+        taskId: subId,
+        title: editingSubtaskTitle.trim(),
+      });
+      setEditingSubtaskId(null);
+      toast.success("Subtask updated!");
+    } catch (err) {
+      console.error("Failed to update subtask:", err);
+      toast.error("Failed to update subtask.");
+    } finally {
+      setIsSavingSubtaskEdit(false);
+    }
+  };
+
+  const handleCancelEditSubtask = () => {
+    setEditingSubtaskId(null);
+    setEditingSubtaskTitle("");
   };
 
   // Milestone Creation Form State
@@ -384,6 +549,7 @@ export default function TopicDetailPage({
 
         <div className="flex items-center gap-2">
           <ZenFocusModal />
+          <PdfUploadDialog topicId={topicId} topicName={topic.name} />
           <FeynmanEvaluatorDialog topicName={topic.name} />
           <Button
             variant="outline"
@@ -531,6 +697,22 @@ export default function TopicDetailPage({
                   <p className="text-[11px] text-muted-foreground">Break topic into actionable targets with deadlines & priorities.</p>
                 </div>
               </div>
+
+              <PdfUploadDialog
+                topicId={topicId}
+                topicName={topic.name}
+                triggerButton={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10 gap-1.5 h-8"
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    <span>Upload Syllabus / PDF</span>
+                  </Button>
+                }
+              />
             </div>
 
             <form onSubmit={handleAddTask} className="space-y-3 pt-1">
@@ -713,133 +895,263 @@ export default function TopicDetailPage({
                   const totalSubs = subtasks.length;
                   const doneSubs = subtasks.filter((s) => s.status === "done").length;
                   const subProgress = totalSubs === 0 ? 0 : Math.round((doneSubs / totalSubs) * 100);
+                  const isCurrentlyDragged = draggedTaskId === task._id;
+                  const isDragOver = dragOverTaskId === task._id;
 
                   return (
                     <div
                       key={task._id}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData("text/plain", task._id);
+                        e.dataTransfer.effectAllowed = "move";
+                        setDraggedTaskId(task._id);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        if (dragOverTaskId !== task._id) {
+                          setDragOverTaskId(task._id);
+                        }
+                      }}
+                      onDragLeave={() => {
+                        if (dragOverTaskId === task._id) {
+                          setDragOverTaskId(null);
+                        }
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        handleDropTask(task._id);
+                      }}
+                      onDragEnd={() => {
+                        setDraggedTaskId(null);
+                        setDragOverTaskId(null);
+                      }}
                       className={`group flex flex-col rounded-2xl border transition-all ${
-                        isDone
+                        isCurrentlyDragged
+                          ? "opacity-40 scale-[0.99] border-dashed border-primary"
+                          : isDragOver
+                          ? "border-primary ring-2 ring-primary/40 bg-primary/5 shadow-md"
+                          : isDone
                           ? "border-border/50 bg-muted/20 text-muted-foreground"
                           : "border-border bg-card text-foreground hover:border-primary/50 shadow-2xs hover:shadow-xs"
                       }`}
                     >
                       {/* Main Task Header Row */}
-                      <div className="flex items-center justify-between p-3.5 sm:p-4 gap-3">
-                        <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 pr-2">
-                          {/* Chevron Accordion Trigger */}
-                          <button
-                            type="button"
-                            onClick={() => toggleExpandTask(task._id)}
-                            className="text-muted-foreground hover:text-primary transition-colors p-1 rounded-md hover:bg-muted cursor-pointer shrink-0"
-                            title={isExpanded ? "Collapse subtasks" : "Expand subtasks"}
-                          >
-                            <ChevronRight
-                              className={`h-4 w-4 transition-transform duration-200 ${
-                                isExpanded ? "rotate-90 text-primary" : ""
-                              }`}
+                      {editingTaskId === task._id ? (
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-3.5 sm:p-4 gap-3 bg-primary/5 rounded-2xl border-2 border-primary/50">
+                          <div className="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                            <Input
+                              value={editingTaskTitle}
+                              onChange={(e) => setEditingTaskTitle(e.target.value)}
+                              placeholder="Milestone title..."
+                              className="h-8 text-xs font-semibold bg-background flex-1"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  handleSaveEditTask(task._id);
+                                } else if (e.key === "Escape") {
+                                  handleCancelEditTask();
+                                }
+                              }}
                             />
-                          </button>
-
-                          {/* Checkbox */}
-                          <Checkbox
-                            checked={isDone}
-                            onCheckedChange={() => handleToggleTask(task._id, task.status)}
-                            id={`task-${task._id}`}
-                            aria-label={`Mark task ${task.title} as ${isDone ? "incomplete" : "complete"}`}
-                            className="h-4.5 w-4.5 rounded-md shrink-0"
-                          />
-
-                          {/* Title & Metadata */}
-                          <div className="flex flex-col min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <label
-                                htmlFor={`task-${task._id}`}
-                                className={`text-sm cursor-pointer select-none truncate ${
-                                  isDone ? "line-through text-muted-foreground" : "font-semibold text-foreground"
-                                }`}
-                              >
-                                {task.title}
-                              </label>
-
-                              {/* Subtasks Count Pill */}
-                              <button
-                                type="button"
-                                onClick={() => toggleExpandTask(task._id)}
-                                className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full transition-colors cursor-pointer ${
-                                  totalSubs > 0
-                                    ? "bg-primary/10 text-primary hover:bg-primary/20"
-                                    : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
-                                }`}
-                              >
-                                <CornerDownRight className="h-3 w-3" />
-                                <span>{totalSubs > 0 ? `${doneSubs}/${totalSubs} sub-tasks` : "+ Add sub-tasks"}</span>
-                              </button>
+                            <div className="w-full sm:w-36">
+                              <Select2Dropdown
+                                options={[
+                                  {
+                                    value: "high",
+                                    label: "High Priority",
+                                    icon: <div className="h-2 w-2 rounded-full bg-red-500" />,
+                                  },
+                                  {
+                                    value: "medium",
+                                    label: "Medium Priority",
+                                    icon: <div className="h-2 w-2 rounded-full bg-amber-500" />,
+                                  },
+                                  {
+                                    value: "low",
+                                    label: "Low Priority",
+                                    icon: <div className="h-2 w-2 rounded-full bg-blue-500" />,
+                                  },
+                                ]}
+                                value={editingTaskPriority}
+                                onChange={(val) =>
+                                  setEditingTaskPriority(val as "low" | "medium" | "high")
+                                }
+                                isSearchable={false}
+                              />
                             </div>
-
-                            <div className="flex flex-wrap items-center gap-2 mt-1">
-                              {/* Deadline Badge */}
-                              {deadlineInfo && (
-                                <span
-                                  className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] ${deadlineInfo.className}`}
-                                >
-                                  {deadlineInfo.isOverdue ? (
-                                    <Clock className="h-3 w-3 text-red-500" />
-                                  ) : (
-                                    <CalendarDays className="h-3 w-3" />
-                                  )}
-                                  <span>{deadlineInfo.label}</span>
-                                </span>
-                              )}
-
-                              {/* Completed Timestamp */}
-                              {task.completedAt && isDone && (
-                                <span className="text-[10px] text-emerald-600 dark:text-emerald-400">
-                                  Completed {new Date(task.completedAt).toLocaleDateString()}
-                                </span>
-                              )}
+                            <div className="w-full sm:w-36">
+                              <FlatpickrDatePicker
+                                value={editingTaskDueDate}
+                                onChange={(d) => setEditingTaskDueDate(d)}
+                                placeholder="Deadline"
+                                minDate="today"
+                              />
                             </div>
                           </div>
+                          <div className="flex items-center gap-1.5 ml-auto sm:ml-0 shrink-0">
+                            <Button
+                              size="sm"
+                              onClick={() => handleSaveEditTask(task._id)}
+                              disabled={isSavingTaskEdit || !editingTaskTitle.trim()}
+                              className="h-8 px-3 text-xs gap-1 bg-primary text-primary-foreground font-semibold cursor-pointer"
+                            >
+                              {isSavingTaskEdit ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Check className="h-3.5 w-3.5" />
+                              )}
+                              <span>Save</span>
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={handleCancelEditTask}
+                              disabled={isSavingTaskEdit}
+                              className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         </div>
+                      ) : (
+                        <div className="flex items-center justify-between p-3.5 sm:p-4 gap-3">
+                          <div className="flex items-center gap-1.5 sm:gap-2.5 flex-1 min-w-0 pr-2">
+                            {/* Drag Handle */}
+                            <div
+                              className="text-muted-foreground/40 hover:text-foreground cursor-grab active:cursor-grabbing p-1 -ml-1 rounded touch-none transition-colors"
+                              title="Drag to reorder position"
+                            >
+                              <GripVertical className="h-4 w-4" />
+                            </div>
 
-                        {/* Right Actions */}
-                        <div className="flex items-center gap-2 shrink-0">
-                          {task.priority && (
-                            <span
-                              className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
-                                task.priority === "high"
-                                  ? "bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20"
-                                  : task.priority === "medium"
-                                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
-                                  : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                            {/* Chevron Accordion Trigger */}
+                            <button
+                              type="button"
+                              onClick={() => toggleExpandTask(task._id)}
+                              className="text-muted-foreground hover:text-primary transition-colors p-1 rounded-md hover:bg-muted cursor-pointer shrink-0"
+                              title={isExpanded ? "Collapse subtasks" : "Expand subtasks"}
+                            >
+                              <ChevronRight
+                                className={`h-4 w-4 transition-transform duration-200 ${
+                                  isExpanded ? "rotate-90 text-primary" : ""
+                                }`}
+                              />
+                            </button>
+
+                            {/* Checkbox */}
+                            <Checkbox
+                              checked={isDone}
+                              onCheckedChange={() => handleToggleTask(task._id, task.status)}
+                              id={`task-${task._id}`}
+                              aria-label={`Mark task ${task.title} as ${isDone ? "incomplete" : "complete"}`}
+                              className="h-4.5 w-4.5 rounded-md shrink-0"
+                            />
+
+                            {/* Title & Metadata */}
+                            <div className="flex flex-col min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <label
+                                  htmlFor={`task-${task._id}`}
+                                  className={`text-sm cursor-pointer select-none truncate ${
+                                    isDone ? "line-through text-muted-foreground" : "font-semibold text-foreground"
+                                  }`}
+                                >
+                                  {task.title}
+                                </label>
+
+                                {/* Subtasks Count Pill */}
+                                <button
+                                  type="button"
+                                  onClick={() => toggleExpandTask(task._id)}
+                                  className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full transition-colors cursor-pointer ${
+                                    totalSubs > 0
+                                      ? "bg-primary/10 text-primary hover:bg-primary/20"
+                                      : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                  }`}
+                                >
+                                  <CornerDownRight className="h-3 w-3" />
+                                  <span>{totalSubs > 0 ? `${doneSubs}/${totalSubs} sub-tasks` : "+ Add sub-tasks"}</span>
+                                </button>
+                              </div>
+
+                              <div className="flex flex-wrap items-center gap-2 mt-1">
+                                {/* Deadline Badge */}
+                                {deadlineInfo && (
+                                  <span
+                                    className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] ${deadlineInfo.className}`}
+                                  >
+                                    {deadlineInfo.isOverdue ? (
+                                      <Clock className="h-3 w-3 text-red-500" />
+                                    ) : (
+                                      <CalendarDays className="h-3 w-3" />
+                                    )}
+                                    <span>{deadlineInfo.label}</span>
+                                  </span>
+                                )}
+
+                                {/* Completed Timestamp */}
+                                {task.completedAt && isDone && (
+                                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400">
+                                    Completed {new Date(task.completedAt).toLocaleDateString()}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Right Actions */}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {task.priority && (
+                              <span
+                                className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                                  task.priority === "high"
+                                    ? "bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20"
+                                    : task.priority === "medium"
+                                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                                    : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                                }`}
+                              >
+                                {task.priority}
+                              </span>
+                            )}
+
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleToggleScheduled(task)}
+                              title={isScheduled ? "Remove from Daily Planner" : "Add to Daily Planner"}
+                              className={`h-8 w-8 rounded-lg cursor-pointer ${
+                                isScheduled ? "text-amber-500 bg-amber-500/10" : "text-muted-foreground hover:text-foreground hover:bg-muted"
                               }`}
                             >
-                              {task.priority}
-                            </span>
-                          )}
+                              <Star className={`h-4 w-4 ${isScheduled ? "fill-amber-500" : ""}`} />
+                            </Button>
 
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleToggleScheduled(task)}
-                            title={isScheduled ? "Remove from Daily Planner" : "Add to Daily Planner"}
-                            className={`h-8 w-8 rounded-lg cursor-pointer ${
-                              isScheduled ? "text-amber-500 bg-amber-500/10" : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                            }`}
-                          >
-                            <Star className={`h-4 w-4 ${isScheduled ? "fill-amber-500" : ""}`} />
-                          </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleStartEditTask(task)}
+                              className="h-8 w-8 rounded-lg text-muted-foreground opacity-70 group-hover:opacity-100 hover:text-primary hover:bg-primary/10 cursor-pointer"
+                              title="Edit milestone"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
 
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteTask(task._id)}
-                            className="h-8 w-8 rounded-lg text-muted-foreground opacity-70 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10 cursor-pointer"
-                            aria-label="Delete milestone"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteTask(task._id)}
+                              className="h-8 w-8 rounded-lg text-muted-foreground opacity-70 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10 cursor-pointer"
+                              aria-label="Delete milestone"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                       {/* Dropdown Sub-tasks Drawer */}
                       {isExpanded && (
@@ -868,12 +1180,106 @@ export default function TopicDetailPage({
                             ) : (
                               subtasks.map((sub) => {
                                 const isSubDone = sub.status === "done";
+                                const isSubDragged = draggedSubtaskId === sub._id;
+                                const isSubDragOver = dragOverSubtaskId === sub._id;
+                                const isSubEditing = editingSubtaskId === sub._id;
+
+                                if (isSubEditing) {
+                                  return (
+                                    <div
+                                      key={sub._id}
+                                      className="flex items-center gap-2 p-1.5 rounded-lg border border-primary bg-primary/5 shadow-xs"
+                                    >
+                                      <Input
+                                        value={editingSubtaskTitle}
+                                        onChange={(e) => setEditingSubtaskTitle(e.target.value)}
+                                        placeholder="Subtask title..."
+                                        className="h-7 text-xs bg-background flex-1"
+                                        autoFocus
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter") {
+                                            e.preventDefault();
+                                            handleSaveEditSubtask(sub._id);
+                                          } else if (e.key === "Escape") {
+                                            handleCancelEditSubtask();
+                                          }
+                                        }}
+                                      />
+                                      <Button
+                                        size="sm"
+                                        onClick={() => handleSaveEditSubtask(sub._id)}
+                                        disabled={isSavingSubtaskEdit || !editingSubtaskTitle.trim()}
+                                        className="h-7 px-2.5 text-xs gap-1 font-semibold cursor-pointer"
+                                      >
+                                        {isSavingSubtaskEdit ? (
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                          <Check className="h-3 w-3" />
+                                        )}
+                                        <span>Save</span>
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={handleCancelEditSubtask}
+                                        disabled={isSavingSubtaskEdit}
+                                        className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  );
+                                }
+
                                 return (
                                   <div
                                     key={sub._id}
-                                    className="group/sub flex items-center justify-between gap-2.5 rounded-lg border border-border/60 bg-card p-2.5 px-3 text-xs shadow-2xs hover:border-primary/40 transition-all"
+                                    draggable
+                                    onDragStart={(e) => {
+                                      e.stopPropagation();
+                                      e.dataTransfer.setData("text/plain", sub._id);
+                                      e.dataTransfer.effectAllowed = "move";
+                                      setDraggedSubtaskId(sub._id);
+                                    }}
+                                    onDragOver={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      e.dataTransfer.dropEffect = "move";
+                                      if (dragOverSubtaskId !== sub._id) {
+                                        setDragOverSubtaskId(sub._id);
+                                      }
+                                    }}
+                                    onDragLeave={(e) => {
+                                      e.stopPropagation();
+                                      if (dragOverSubtaskId === sub._id) {
+                                        setDragOverSubtaskId(null);
+                                      }
+                                    }}
+                                    onDrop={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleDropSubtask(task._id, sub._id);
+                                    }}
+                                    onDragEnd={(e) => {
+                                      e.stopPropagation();
+                                      setDraggedSubtaskId(null);
+                                      setDragOverSubtaskId(null);
+                                    }}
+                                    className={`group/sub flex items-center justify-between gap-2.5 rounded-lg border bg-card p-2.5 px-3 text-xs shadow-2xs transition-all ${
+                                      isSubDragged
+                                        ? "opacity-40 border-dashed border-primary scale-[0.99]"
+                                        : isSubDragOver
+                                        ? "border-primary ring-1 ring-primary/40 bg-primary/5 shadow-xs"
+                                        : "border-border/60 hover:border-primary/40"
+                                    }`}
                                   >
-                                    <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                      <div
+                                        className="text-muted-foreground/40 hover:text-foreground cursor-grab active:cursor-grabbing p-0.5 -ml-1 touch-none"
+                                        title="Drag to reorder subtask"
+                                      >
+                                        <GripVertical className="h-3.5 w-3.5" />
+                                      </div>
                                       <Checkbox
                                         checked={isSubDone}
                                         onCheckedChange={() => handleToggleTask(sub._id, sub.status)}
@@ -890,14 +1296,24 @@ export default function TopicDetailPage({
                                       </label>
                                     </div>
 
-                                    <button
-                                      type="button"
-                                      onClick={() => handleDeleteTask(sub._id)}
-                                      className="opacity-0 group-hover/sub:opacity-100 text-muted-foreground hover:text-destructive p-1 rounded transition-opacity cursor-pointer"
-                                      title="Delete subtask"
-                                    >
-                                      <Trash2 className="h-3 w-3" />
-                                    </button>
+                                    <div className="flex items-center gap-0.5 opacity-0 group-hover/sub:opacity-100 transition-opacity">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleStartEditSubtask(sub)}
+                                        className="text-muted-foreground hover:text-primary p-1 rounded transition-colors cursor-pointer"
+                                        title="Edit subtask"
+                                      >
+                                        <Pencil className="h-3 w-3" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteTask(sub._id)}
+                                        className="text-muted-foreground hover:text-destructive p-1 rounded transition-colors cursor-pointer"
+                                        title="Delete subtask"
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </button>
+                                    </div>
                                   </div>
                                 );
                               })

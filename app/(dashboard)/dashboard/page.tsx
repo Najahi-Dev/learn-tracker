@@ -5,6 +5,7 @@ import { api } from "@/convex/_generated/api";
 import { TopicCard, type TopicItem } from "@/components/topic-card";
 import { CreateTopicDialog } from "@/components/create-topic-dialog";
 import { AiRoadmapDialog } from "@/components/ai/ai-roadmap-dialog";
+import { PdfUploadDialog } from "@/components/ai/pdf-upload-dialog";
 import { StreakBadge } from "@/components/analytics/streak-badge";
 import { ActivityHeatmap } from "@/components/analytics/activity-heatmap";
 import { AchievementBadges } from "@/components/analytics/achievement-badges";
@@ -48,6 +49,7 @@ export default function DashboardPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
           <ViewSwitcher />
+          <PdfUploadDialog />
           <AiRoadmapDialog />
           <CreateTopicDialog />
         </div>

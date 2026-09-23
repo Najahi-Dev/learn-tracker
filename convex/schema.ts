@@ -41,6 +41,7 @@ export default defineSchema({
     dueDate: v.optional(v.number()),
     scheduledForToday: v.optional(v.boolean()),
     parentTaskId: v.optional(v.id("tasks")),
+    order: v.optional(v.number()),
   })
     .index("by_topic", ["topicId"])
     .index("by_user", ["userId"])
